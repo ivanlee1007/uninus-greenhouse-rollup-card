@@ -12,6 +12,6 @@ if(!window.customCards.some(card=>card.type===CARD_TAG))window.customCards.push(
   name:'UNiNUS Greenhouse Rollup Card',
   description:'Responsive four-face greenhouse roll-up curtain status card with animation and visual editor.',
   preview:true,
-  documentationURL:'https://github.com/ivanlee1007/uninus-greenhouse-rollup',
+  documentationURL:'https://github.com/ivanlee1007/uninus-greenhouse-rollup-card',
 });
 console.info(`%c UNiNUS GREENHOUSE ROLLUP CARD %c v${VERSION} `,'color:#10241d;background:#ffd54a;font-weight:800;padding:3px 6px','color:#fff;background:#18382e;padding:3px 6px');

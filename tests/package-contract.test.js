@@ -31,3 +31,8 @@ test('README documents the visual editor and exact items per row', async () => {
   assert.match(readme, /舊版雙 Switch/);
   assert.doesNotMatch(readme, /force_1x4/);
 });
+
+test('card picker metadata links to the standalone card repository', async () => {
+  const source = await readFile(new URL('src/index.js', root), 'utf8');
+  assert.match(source, /documentationURL:'https:\/\/github\.com\/ivanlee1007\/uninus-greenhouse-rollup-card'/);
+});

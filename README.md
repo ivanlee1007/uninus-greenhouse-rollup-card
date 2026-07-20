@@ -4,6 +4,8 @@
 
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/) [![CI](https://github.com/ivanlee1007/uninus-greenhouse-rollup-card/actions/workflows/ci.yml/badge.svg)](https://github.com/ivanlee1007/uninus-greenhouse-rollup-card/actions/workflows/ci.yml)
 
+![UNiNUS Greenhouse Rollup Card 四面捲揚預覽](assets/preview.png)
+
 ## 特色
 
 - 同一卡片可使用原生 MQTT Cover 或 Integration 產生的 Cover。
