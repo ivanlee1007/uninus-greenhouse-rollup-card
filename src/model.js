@@ -7,7 +7,7 @@ const FACE_DEFAULTS = {
   north: { key: 'north', compass: 'N', name: '北側' },
 };
 
-const THEMES = new Set(['dark', 'light', 'greenhouse', 'sand']);
+const THEMES = new Set(['dark', 'light', 'greenhouse', 'sand', 'uninus']);
 const COLOR_PATTERN = /^(#[0-9a-f]{3,8}|rgba?\([^)]+\)|hsla?\([^)]+\)|[a-z]+)$/i;
 const COVER_FEATURE_OPEN = 1;
 const COVER_FEATURE_CLOSE = 2;
@@ -283,19 +283,23 @@ export function configForSave(config) {
 const THEME_TOKENS = Object.freeze({
   dark: {
     background: 'radial-gradient(circle at 12% -8%,rgba(104,128,135,.22),transparent 38%),linear-gradient(155deg,#192329 0%,#10171b 58%,#0a0f12 100%)',
-    surface: 'rgba(31,43,48,.9)', text: '#eef3f2', muted: '#b8c8c5', frame: '#10191d', shadow: 'rgba(2,8,10,.38)',
+    surface: 'rgba(31,43,48,.9)', text: '#eef3f2', muted: '#b8c8c5', frame: '#10191d', shadow: 'rgba(2,8,10,.38)', uiAccent: '#f4cf5a', uiIdle: '#b8c8c5', uiDanger: '#ff8a80',
   },
   light: {
     background: 'radial-gradient(circle at 10% -12%,rgba(255,255,255,.96),transparent 42%),linear-gradient(155deg,#f2f5f3 0%,#e7ece9 58%,#dde5e1 100%)',
-    surface: 'rgba(255,255,255,.78)', text: '#21312e', muted: '#4f605b', frame: '#d5dfdb', shadow: 'rgba(39,61,54,.15)',
+    surface: 'rgba(255,255,255,.78)', text: '#21312e', muted: '#4f605b', frame: '#d5dfdb', shadow: 'rgba(39,61,54,.15)', uiAccent: '#155f55', uiIdle: '#50615d', uiDanger: '#a83220',
   },
   greenhouse: {
     background: 'radial-gradient(circle at 14% -10%,rgba(104,148,128,.24),transparent 40%),linear-gradient(155deg,#1b382f 0%,#132a23 58%,#0d1e19 100%)',
-    surface: 'rgba(31,67,56,.84)', text: '#eff7f2', muted: '#b9cec4', frame: '#10271f', shadow: 'rgba(5,26,19,.34)',
+    surface: 'rgba(31,67,56,.84)', text: '#eff7f2', muted: '#b9cec4', frame: '#10271f', shadow: 'rgba(5,26,19,.34)', uiAccent: '#f3cd5c', uiIdle: '#b9cec4', uiDanger: '#ff9a8f',
   },
   sand: {
     background: 'radial-gradient(circle at 12% -10%,rgba(255,255,255,.56),transparent 42%),linear-gradient(155deg,#eee9df 0%,#e2d8c9 58%,#d7cab7 100%)',
-    surface: 'rgba(250,247,241,.78)', text: '#3d352b', muted: '#66594c', frame: '#d2c5b2', shadow: 'rgba(72,54,32,.16)',
+    surface: 'rgba(250,247,241,.78)', text: '#3d352b', muted: '#66594c', frame: '#d2c5b2', shadow: 'rgba(72,54,32,.16)', uiAccent: '#6d4a0c', uiIdle: '#66594c', uiDanger: '#922f20',
+  },
+  uninus: {
+    background: 'radial-gradient(circle at 10% -12%,#ff87543d,transparent 42%),radial-gradient(circle at 92% 8%,#3074c12e,transparent 36%),linear-gradient(155deg,#fbfaf8 0%,#f3f5f6 58%,#e9eef2 100%)',
+    surface: 'rgba(255,255,255,.84)', text: '#3f4548', muted: '#53626d', frame: '#d4dde4', shadow: 'rgba(43,69,91,.16)', uiAccent: '#285f9e', uiIdle: '#53626d', uiDanger: '#a83220',
   },
 });
 
@@ -310,4 +314,5 @@ export const THEME_OPTIONS = Object.freeze([
   { value: 'light', label: '雲霧白' },
   { value: 'greenhouse', label: '森林深綠' },
   { value: 'sand', label: '暖陶米' },
+  { value: 'uninus', label: 'Uninus' },
 ]);

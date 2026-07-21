@@ -54,6 +54,15 @@ test('README documents bounded eyesight-friendly typography and icon scaling', a
   assert.match(readme, /高度.*自然延展.*不.*縮小字體/s);
 });
 
+test('README documents high-contrast light themes and the official Uninus palette', async () => {
+  const readme = await readFile(new URL('README.md', root), 'utf8');
+  assert.match(readme, /雲霧白.*#155f55/s);
+  assert.match(readme, /暖陶米.*#6d4a0c/s);
+  assert.match(readme, /https:\/\/www\.uninus\.com\.tw\//);
+  assert.match(readme, /Uninus.*#ff8754.*#3074c1.*#285f9e/s);
+  assert.match(readme, /disabled.*\.52/s);
+});
+
 test('card picker metadata links to the standalone card repository', async () => {
   const source = await readFile(new URL('src/index.js', root), 'utf8');
   assert.match(source, /documentationURL:'https:\/\/github\.com\/ivanlee1007\/uninus-greenhouse-rollup-card'/);

@@ -39,8 +39,31 @@ test('integration faces expose explicit open stop close controls through cover s
 
 test('all three global controls share one action accent without status-color overrides', async () => {
   const text = await source('src/card.js');
-  assert.match(text, /\.global-controls button\{[^}]*--global-accent:var\(--open-color\)/);
+  assert.match(text, /\.global-controls button\{[^}]*--global-accent:var\(--rollup-ui-accent\)/);
   assert.doesNotMatch(text, /\.global-(?:open|stop|close)\{--global-accent:/);
+});
+
+test('functional labels and icons use theme-safe UI accents instead of the bright roller color', async () => {
+  const text = await source('src/card.js');
+  assert.match(text, /--rollup-ui-accent:\$\{tokens\.uiAccent\}/);
+  assert.match(text, /--rollup-ui-idle:\$\{tokens\.uiIdle\}/);
+  assert.match(text, /--rollup-ui-danger:\$\{tokens\.uiDanger\}/);
+  assert.match(text, /\.system\{[^}]*color:var\(--rollup-ui-accent\)/);
+  assert.match(text, /\.global-controls button\{[^}]*--global-accent:var\(--rollup-ui-accent\)/);
+  assert.match(text, /\.compass\{[^}]*color:var\(--face-ui-color\)/);
+  assert.match(text, /\.motion\{[^}]*color:var\(--status-ui-color\)/);
+  assert.match(text, /\.foot em\{[^}]*color:var\(--face-ui-color\)/);
+  assert.match(text, /\.controls button\{[^}]*var\(--face-ui-color\)/);
+  assert.match(text, /--face-ui-color:\$\{[^}]*var\(--rollup-ui-accent\)/);
+  assert.match(text, /--status-ui-color:\$\{[^}]*var\(--rollup-ui-idle\)/);
+  assert.match(text, /--status-ui-color:\$\{[^}]*var\(--rollup-ui-danger\)/);
+  assert.doesNotMatch(text, /\.system\{[^}]*color:var\(--rollup-moving\)/);
+});
+
+test('disabled controls remain visibly distinguishable on light themes', async () => {
+  const text = await source('src/card.js');
+  assert.match(text, /\.controls button:disabled\{[^}]*opacity:\.52/);
+  assert.match(text, /\.global-controls button:disabled\{[^}]*opacity:\.52/);
 });
 
 test('single-column mobile layout provides touch-sized cover and global controls', async () => {

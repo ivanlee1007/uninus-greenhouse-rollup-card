@@ -17,8 +17,10 @@ import {
   THEME_OPTIONS,
 } from '../src/model.js';
 
-function hexRgb(value) {
-  return [1, 3, 5].map((offset) => Number.parseInt(value.slice(offset, offset + 2), 16) / 255);
+function hexRgba(value) {
+  const match = value.match(/^#([0-9a-f]{6})([0-9a-f]{2})?$/i);
+  assert.ok(match, `invalid hex token: ${value}`);
+  return [1, 3, 5].map((offset) => Number.parseInt(value.slice(offset, offset + 2), 16) / 255).concat(match[2] ? Number.parseInt(match[2], 16) / 255 : 1);
 }
 
 function rgba(value) {
@@ -29,6 +31,18 @@ function rgba(value) {
 
 function composite([red, green, blue, alpha], background) {
   return [red, green, blue].map((channel, index) => alpha * channel + (1 - alpha) * background[index]);
+}
+
+function gradientBackgroundSamples(background) {
+  const colors = [...background.matchAll(/rgba\(\d+,\d+,\d+,[\d.]+\)|#[0-9a-f]{6}(?:[0-9a-f]{2})?/gi)].map(([value]) => value.startsWith('#') ? hexRgba(value) : rgba(value));
+  const bases = colors.filter(([, , , alpha]) => alpha === 1);
+  const overlays = colors.filter(([, , , alpha]) => alpha < 1);
+  assert.ok(bases.length >= 2, 'theme must have at least two opaque gradient stops');
+  return bases.flatMap((base) => Array.from({ length: 2 ** overlays.length }, (_, mask) => {
+    let sample = base.slice(0, 3);
+    for (let index = overlays.length - 1; index >= 0; index -= 1) if (mask & (1 << index)) sample = composite(overlays[index], sample);
+    return sample;
+  }));
 }
 
 function luminance(color) {
@@ -483,32 +497,57 @@ test('resolveThemeTokens exposes distinct light and dark surfaces with custom ba
   assert.equal(custom.background, '#abcdef');
 });
 
-test('the four background atmospheres form one restrained layered design system', () => {
+test('the five background atmospheres include an official-site-inspired Uninus theme', () => {
   assert.deepEqual(THEME_OPTIONS, [
     { value: 'dark', label: '深夜石墨' },
     { value: 'light', label: '雲霧白' },
     { value: 'greenhouse', label: '森林深綠' },
     { value: 'sand', label: '暖陶米' },
+    { value: 'uninus', label: 'Uninus' },
   ]);
 
   const backgrounds = THEME_OPTIONS.map(({ value }) => resolveThemeTokens(normalizeConfig({ theme: value })).background);
-  assert.equal(new Set(backgrounds).size, 4);
+  assert.equal(new Set(backgrounds).size, 5);
   for (const background of backgrounds) {
     assert.match(background, /radial-gradient/);
     assert.match(background, /linear-gradient/);
   }
+
+  const uninus = resolveThemeTokens(normalizeConfig({ theme: 'uninus' }));
+  assert.match(uninus.background, /#ff8754/i);
+  assert.match(uninus.background, /#3074c1/i);
+  assert.equal(uninus.text, '#3f4548');
 });
 
 test('small muted copy keeps WCAG AA contrast on every themed surface', () => {
   for (const { value } of THEME_OPTIONS) {
     const tokens = resolveThemeTokens(normalizeConfig({ theme: value }));
     assert.match(tokens.muted, /^#[0-9a-f]{6}$/i);
-    const foreground = hexRgb(tokens.muted);
+    const foreground = hexRgba(tokens.muted).slice(0, 3);
     const surface = rgba(tokens.surface);
-    const backgroundStops = [...tokens.background.matchAll(/#[0-9a-f]{6}/gi)].map(([color]) => hexRgb(color));
-    assert.ok(backgroundStops.length >= 2);
-    for (const background of backgroundStops) {
+    for (const background of gradientBackgroundSamples(tokens.background)) {
       assert.ok(contrastRatio(foreground, composite(surface, background)) >= 4.5, `${value} muted copy is below 4.5:1`);
     }
   }
+});
+
+test('functional UI accents keep WCAG AA contrast on light sand and Uninus surfaces', () => {
+  assert.equal(resolveThemeTokens(normalizeConfig({ theme: 'light' })).uiAccent, '#155f55');
+  assert.equal(resolveThemeTokens(normalizeConfig({ theme: 'sand' })).uiAccent, '#6d4a0c');
+  assert.equal(resolveThemeTokens(normalizeConfig({ theme: 'uninus' })).uiAccent, '#285f9e');
+
+  for (const { value } of THEME_OPTIONS) {
+    const tokens = resolveThemeTokens(normalizeConfig({ theme: value }));
+    const surface = rgba(tokens.surface);
+    for (const key of ['uiAccent', 'uiIdle', 'uiDanger']) {
+      assert.match(tokens[key], /^#[0-9a-f]{6}$/i);
+      const foreground = hexRgba(tokens[key]).slice(0, 3);
+      for (const background of gradientBackgroundSamples(tokens.background)) {
+        assert.ok(contrastRatio(foreground, composite(surface, background)) >= 4.5, `${value} ${key} is below 4.5:1`);
+      }
+    }
+  }
+
+  const custom = resolveThemeTokens(normalizeConfig({ theme: 'light', background_color: '#abcdef' }));
+  assert.equal(custom.uiAccent, '#155f55');
 });
