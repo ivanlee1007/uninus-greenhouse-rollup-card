@@ -39,6 +39,13 @@ test('README documents optional global controls and their card-only scope', asyn
   assert.match(readme, /只控制.*卡片.*cover/i);
 });
 
+test('README documents adaptive card-width layout and mobile touch behavior', async () => {
+  const readme = await readFile(new URL('README.md', root), 'utf8');
+  assert.match(readme, /items_per_row:\s*auto/);
+  assert.match(readme, /自適應.*卡片.*寬度/s);
+  assert.match(readme, /手機.*單欄.*44px/s);
+});
+
 test('card picker metadata links to the standalone card repository', async () => {
   const source = await readFile(new URL('src/index.js', root), 'utf8');
   assert.match(source, /documentationURL:'https:\/\/github\.com\/ivanlee1007\/uninus-greenhouse-rollup-card'/);

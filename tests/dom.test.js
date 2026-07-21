@@ -363,6 +363,26 @@ test('editor exposes and persists the global controls visibility switch', () => 
   editor.remove();
 });
 
+test('editor exposes and persists adaptive items per row', () => {
+  const editor = window.document.createElement('uninus-greenhouse-rollup-test-editor');
+  window.document.body.append(editor);
+  editor.setConfig({ items_per_row: 2 });
+  editor.hass = { states: {} };
+  let saved;
+  editor.addEventListener('config-changed', (event) => { saved = event.detail.config; });
+
+  const select = editor.shadowRoot.querySelector('[data-property="items_per_row"]');
+  const adaptive = select.querySelector('option[value="auto"]');
+  assert.ok(adaptive);
+  assert.match(adaptive.textContent, /自適應/);
+  select.querySelector('option[value="2"]').removeAttribute('selected');
+  adaptive.setAttribute('selected', '');
+  select.dispatchEvent(new window.Event('change', { bubbles: true }));
+
+  assert.equal(saved.items_per_row, 'auto');
+  editor.remove();
+});
+
 test('new cards default every face to Integration Cover mode', () => {
   const config = UninusGreenhouseRollupCard.getStubConfig();
 

@@ -67,9 +67,11 @@ export function normalizeConfig(raw = {}) {
     ...config,
     type: DEFAULT_CONFIG.type,
     theme: THEMES.has(config.theme) ? config.theme : DEFAULT_CONFIG.theme,
-    items_per_row: Number.isFinite(Number(config.items_per_row))
-      ? Math.max(1, Math.min(4, Math.floor(Number(config.items_per_row))))
-      : legacyForceOneByFour === true ? 4 : DEFAULT_CONFIG.items_per_row,
+    items_per_row: config.items_per_row === 'auto'
+      ? 'auto'
+      : Number.isFinite(Number(config.items_per_row))
+        ? Math.max(1, Math.min(4, Math.floor(Number(config.items_per_row))))
+        : legacyForceOneByFour === true ? 4 : DEFAULT_CONFIG.items_per_row,
     animation: config.animation !== false,
     show_global_controls: config.show_global_controls === true,
     faces: FACE_KEYS.map((key, index) => normalizeFace(byKey.get(key) ?? suppliedFaces[index], key)),
@@ -239,7 +241,12 @@ export function resolveSubtitle(config, states = {}) {
   return String(config.subtitle ?? '');
 }
 
-export function selectLayout({ itemsPerRow = DEFAULT_CONFIG.items_per_row } = {}) {
+export function selectLayout({ width = 0, itemsPerRow = DEFAULT_CONFIG.items_per_row } = {}) {
+  if (itemsPerRow === 'auto') {
+    const cardWidth = Math.max(0, Number(width) || 0);
+    const columns = cardWidth >= 1120 ? 4 : cardWidth >= 820 ? 3 : cardWidth >= 520 ? 2 : 1;
+    return `columns-${columns}`;
+  }
   const requested = Math.max(1, Math.min(4, Math.floor(Number(itemsPerRow)) || DEFAULT_CONFIG.items_per_row));
   return `columns-${requested}`;
 }

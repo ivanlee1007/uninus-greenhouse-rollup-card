@@ -412,6 +412,24 @@ test('selectLayout uses the configured items per row at every card width', () =>
   }
 });
 
+test('adaptive items per row follows card-width breakpoints while preserving the fixed default', () => {
+  assert.equal(DEFAULT_CONFIG.items_per_row, 2);
+  assert.equal(normalizeConfig({ items_per_row: 'auto' }).items_per_row, 'auto');
+  for (const [width, layout] of [
+    [0, 'columns-1'],
+    [360, 'columns-1'],
+    [519, 'columns-1'],
+    [520, 'columns-2'],
+    [819, 'columns-2'],
+    [820, 'columns-3'],
+    [1119, 'columns-3'],
+    [1120, 'columns-4'],
+    [1440, 'columns-4'],
+  ]) {
+    assert.equal(selectLayout({ width, itemsPerRow: 'auto' }), layout, `width=${width}`);
+  }
+});
+
 test('selectLayout clamps invalid configured column counts', () => {
   assert.equal(selectLayout({ width: 320, itemsPerRow: 9 }), 'columns-4');
   assert.equal(selectLayout({ width: 920, itemsPerRow: -2 }), 'columns-1');

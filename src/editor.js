@@ -39,7 +39,7 @@ export class UninusGreenhouseRollupCardEditor extends HTMLElement {
         ${this._text('background_color','自訂背景色（選填）',c.background_color)}
         ${this._color('status_idle_color','靜止狀態色',c.status_idle_color)}${this._color('status_moving_color','捲動狀態色',c.status_moving_color)}
         ${this._color('closed_color','關閉區域色',c.closed_color)}${this._color('open_color','開啟／捲軸色',c.open_color)}
-        <div class="field"><label>每列捲揚數量（最多 4 個）</label><select data-property="items_per_row" data-number="true">${[1,2,3,4].map((count)=>`<option value="${count}" ${count===c.items_per_row?'selected':''}>${count} 個</option>`).join('')}</select></div>
+        <div class="field"><label>每列捲揚數量（最多 4 個）</label><select data-property="items_per_row"><option value="auto" ${c.items_per_row==='auto'?'selected':''}>自適應（依卡片寬度）</option>${[1,2,3,4].map((count)=>`<option value="${count}" ${count===c.items_per_row?'selected':''}>${count} 個</option>`).join('')}</select></div>
         <div class="field switch"><label>啟用動畫</label><input type="checkbox" data-property="animation" data-value-type="boolean" ${c.animation?'checked':''}></div>
         <div class="field switch full"><label>顯示「全開／全停／全關」全域控制</label><input type="checkbox" data-property="show_global_controls" data-value-type="boolean" ${c.show_global_controls?'checked':''}></div>
       </div></section>

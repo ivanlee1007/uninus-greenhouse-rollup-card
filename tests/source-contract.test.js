@@ -43,6 +43,11 @@ test('all three global controls share one action accent without status-color ove
   assert.doesNotMatch(text, /\.global-(?:open|stop|close)\{--global-accent:/);
 });
 
+test('single-column mobile layout provides touch-sized cover and global controls', async () => {
+  const text = await source('src/card.js');
+  assert.match(text, /\.columns-1 \.global-controls button,\.columns-1 \.controls button\{min-height:44px/);
+});
+
 test('card respects reduced motion and uses namespaced effect classes', async () => {
   const text = await source('src/card.js');
   assert.match(text, /prefers-reduced-motion/);
