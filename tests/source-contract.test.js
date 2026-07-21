@@ -22,9 +22,9 @@ test('card uses inline containment so responsive rows keep intrinsic height', as
   assert.doesNotMatch(text, /cqh/);
 });
 
-test('editor exposes adaptive items-per-row, subtitle, per-face entity and color controls', async () => {
+test('editor exposes adaptive layout, optional global controls, subtitle, per-face entity and color controls', async () => {
   const text = await source('src/editor.js');
-  for (const marker of ['subtitle_attribute', 'items_per_row', '每列捲揚數量', 'status_moving_color', 'background_color', 'cover_entity', '標準 Cover Entity', 'motion_entity', 'max_entity', 'accent_color', 'ha-entity-picker', 'config-changed']) {
+  for (const marker of ['subtitle_attribute', 'items_per_row', '每列捲揚數量', 'show_global_controls', '全開／全停／全關', 'status_moving_color', 'background_color', 'cover_entity', '標準 Cover Entity', 'motion_entity', 'max_entity', 'accent_color', 'ha-entity-picker', 'config-changed']) {
     assert.match(text, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
   assert.doesNotMatch(text, /force_1x4/);

@@ -1,4 +1,4 @@
-import { coverServiceForAction, GRID_OPTIONS, normalizeConfig, resolveFaceState, resolveSubtitle, resolveThemeTokens, selectLayout } from './model.js';
+import { coverServiceForAction, GRID_OPTIONS, normalizeConfig, resolveFaceState, resolveGlobalControlTargets, resolveSubtitle, resolveThemeTokens, selectLayout } from './model.js';
 
 const escapeHtml=(value)=>String(value??'').replace(/[&<>"']/g,(char)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const rollupName=(value)=>{const name=String(value??'').trim();return name.endsWith('捲揚')||/\broll[ -]?up\b/i.test(name)?name:`${name}捲揚`};
@@ -18,13 +18,14 @@ export class UninusGreenhouseRollupCard extends HTMLElement {
     .scale{position:absolute;z-index:6;right:5px;color:rgba(255,255,255,.52);font-size:7px;text-shadow:0 1px 2px #000}.scale.top{top:6px}.scale.mid{top:calc(50% - 4px)}.scale.bottom{bottom:5px}.percent{position:absolute;z-index:7;left:7px;bottom:6px;padding:3px 5px;border-radius:6px;background:rgba(0,0,0,.4);color:#fff;font-size:8px;font-weight:900}.unknown .scene::after{content:'位置未知';position:absolute;z-index:6;inset:0;display:grid;place-items:center;background:repeating-linear-gradient(135deg,rgba(255,255,255,.035) 0 8px,rgba(0,0,0,.055) 8px 16px);color:rgba(255,255,255,.72);font-size:9px;font-weight:800;letter-spacing:.08em}
     .foot{display:flex;align-items:end;justify-content:space-between;gap:7px;margin-top:8px;text-align:left}.more-info{all:unset;box-sizing:border-box;display:flex;align-items:end;justify-content:space-between;gap:7px;width:100%;border-radius:6px;cursor:pointer}.more-info:focus-visible{outline:2px solid var(--face-accent);outline-offset:2px}.copy{display:grid;min-width:0;gap:2px}.copy strong,.copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.copy strong{font-size:clamp(9px,2.2cqw,11px)}.copy small{color:var(--rollup-muted);font-size:clamp(8px,1.7cqw,9px)}.foot em{color:var(--face-accent);font-size:clamp(10px,2.5cqw,13px);font-style:normal;font-weight:900}
     .controls{display:grid;grid-template-columns:repeat(var(--control-count,3),minmax(0,1fr));gap:5px;margin-top:8px}.controls button{min-width:0;padding:6px 4px;border:1px solid color-mix(in srgb,var(--face-accent) 30%,transparent);border-radius:8px;background:color-mix(in srgb,var(--face-accent) 11%,transparent);color:var(--rollup-text);font:inherit;font-size:9px;font-weight:800;cursor:pointer}.controls button:hover{background:color-mix(in srgb,var(--face-accent) 22%,transparent)}.controls button:focus-visible{outline:2px solid var(--face-accent);outline-offset:1px}.controls button:disabled{cursor:not-allowed;opacity:.38}.controls .stop{border-color:color-mix(in srgb,var(--rollup-moving) 35%,transparent)}
+    .global-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:-2px 2px 14px;padding:7px;border:1px solid color-mix(in srgb,var(--rollup-text) 9%,transparent);border-radius:13px;background:color-mix(in srgb,var(--rollup-surface) 68%,transparent)}.global-controls button{min-width:0;height:34px;border:1px solid color-mix(in srgb,var(--global-accent) 38%,transparent);border-radius:9px;background:color-mix(in srgb,var(--global-accent) 13%,transparent);color:var(--rollup-text);font:inherit;font-size:10px;font-weight:900;letter-spacing:.04em;cursor:pointer}.global-controls button::before{display:inline-block;margin-right:6px;color:var(--global-accent)}.global-controls .global-open{--global-accent:var(--open-color)}.global-controls .global-open::before{content:'▲'}.global-controls .global-stop{--global-accent:var(--rollup-moving)}.global-controls .global-stop::before{content:'■'}.global-controls .global-close{--global-accent:var(--rollup-idle)}.global-controls .global-close::before{content:'▼'}.global-controls button:hover{background:color-mix(in srgb,var(--global-accent) 24%,transparent)}.global-controls button:focus-visible{outline:2px solid var(--global-accent);outline-offset:1px}.global-controls button:disabled{cursor:not-allowed;opacity:.38}
     .columns-3 .face,.columns-4 .face{padding:clamp(6px,1cqw,9px)}.columns-3 .face-head,.columns-4 .face-head{grid-template-columns:22px minmax(0,1fr);grid-template-areas:'compass name' 'motion motion';gap:4px;margin-bottom:6px}.columns-3 .compass,.columns-4 .compass{grid-area:compass;width:22px;height:22px}.columns-3 .name,.columns-4 .name{grid-area:name}.columns-3 .motion,.columns-4 .motion{grid-area:motion;justify-content:center;padding:4px 6px}.columns-3 .scene,.columns-4 .scene{height:clamp(64px,12cqw,88px)}.columns-3 .foot,.columns-4 .foot{display:grid;margin-top:6px}.columns-3 .foot em,.columns-4 .foot em{display:none}
     .columns-1 .faces{gap:8px}.columns-1 .scene{height:clamp(72px,28cqw,112px)}.columns-1 .face{padding:9px}.columns-1 .face-head{margin-bottom:6px}.columns-1 .foot{margin-top:6px}
     @keyframes roll{to{background-position:30px 0}}@keyframes sweep{0%{left:-40%;opacity:0}35%{opacity:1}100%{left:120%;opacity:0}}@keyframes airflow{0%{left:-45%;opacity:0}25%{opacity:.9}100%{left:110%;opacity:0}}@keyframes pulse{0%,100%{opacity:.55;transform:scale(.85)}50%{opacity:1;transform:scale(1.2)}}
     @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
   `;
 
-  constructor(){super();this.attachShadow({mode:'open'});this._config=normalizeConfig({});this._layout='columns-2';this._observer=null;this._lastRect={width:0,height:0};this._hass=null;this._pendingActions=new Map()}
+  constructor(){super();this.attachShadow({mode:'open'});this._config=normalizeConfig({});this._layout='columns-2';this._observer=null;this._lastRect={width:0,height:0};this._hass=null;this._pendingActions=new Map();this._globalActions=new Set()}
   set hass(value){this._hass=value;this._render()}
   get hass(){return this._hass}
   setConfig(config){this._config=normalizeConfig(config);this._measure();this._render()}
@@ -46,18 +47,43 @@ export class UninusGreenhouseRollupCard extends HTMLElement {
     finally{pending.delete(action);if(!pending.size)this._pendingActions.delete(entityId);this._render()}
   }
 
+  _globalControlTargets(action){return resolveGlobalControlTargets(this._config,this.hass?.states,action).filter((entityId)=>action!=='stop'||!this._pendingActions.get(entityId)?.has('stop'))}
+
+  async _globalControl(event){
+    event.stopPropagation();
+    const action=event.currentTarget?.dataset?.action;const service=coverServiceForAction(action);const targets=this._globalControlTargets(action);
+    const directionBlocked=action!=='stop'&&(this._globalActions.size||this._pendingActions.size);
+    if(!service||!targets.length||this._globalActions.has(action)||directionBlocked||!this.hass?.callService)return;
+    this._globalActions.add(action);
+    for(const entityId of targets){const pending=this._pendingActions.get(entityId)??new Set();pending.add(action);this._pendingActions.set(entityId,pending)}
+    this._render();
+    try{await this.hass.callService('cover',service,{entity_id:targets})}
+    catch(error){const label={open:'全開',stop:'全停',close:'全關'}[action]??'全域';this.dispatchEvent(new CustomEvent('hass-notification',{detail:{message:`${this._config.title}${label}失敗：${error?.message??error}`},bubbles:true,composed:true}))}
+    finally{for(const entityId of targets){const pending=this._pendingActions.get(entityId);pending?.delete(action);if(!pending?.size)this._pendingActions.delete(entityId)}this._globalActions.delete(action);this._render()}
+  }
+
+  _renderGlobalControls(){
+    if(!this._config.show_global_controls)return '';
+    const directionBusy=Boolean(this._globalActions.size||this._pendingActions.size);
+    return `<nav class="global-controls" aria-label="卡片內所有捲揚全域控制">
+      ${[['open','global-open','全開'],['stop','global-stop','全停'],['close','global-close','全關']].map(([action,className,label])=>{const busy=action==='stop'?this._globalActions.has('stop'):directionBusy;const disabled=busy||!this._globalControlTargets(action).length;return `<button type="button" class="${className}" data-action="${action}" ${disabled?'disabled':''} aria-label="${label}卡片內所有可控制捲揚">${label}</button>`}).join('')}
+    </nav>`;
+  }
+
   _render(){
     if(!this.shadowRoot)return;
     if(!this.hass){this.shadowRoot.innerHTML=`<style>${this.constructor.styles}</style><div class="rollup-card"><div>等待 Home Assistant 狀態資料…</div></div>`;return}
     const tokens=resolveThemeTokens(this._config);const subtitle=resolveSubtitle(this._config,this.hass.states);
-    const style=`--rollup-bg:${tokens.background};--rollup-surface:${tokens.surface};--rollup-text:${tokens.text};--rollup-muted:${tokens.muted};--rollup-frame:${tokens.frame};--rollup-moving:${this._config.status_moving_color};--rollup-idle:${this._config.status_idle_color};--closed-color:${this._config.closed_color}`;
+    const style=`--rollup-bg:${tokens.background};--rollup-surface:${tokens.surface};--rollup-text:${tokens.text};--rollup-muted:${tokens.muted};--rollup-frame:${tokens.frame};--rollup-moving:${this._config.status_moving_color};--rollup-idle:${this._config.status_idle_color};--closed-color:${this._config.closed_color};--open-color:${this._config.open_color}`;
     this.shadowRoot.innerHTML=`<style>${this.constructor.styles}</style><div class="rollup-card ${escapeHtml(this._layout)}" style="${escapeHtml(style)}" aria-label="${escapeHtml(`${this._config.title}，${subtitle}`)}">
       <header class="header"><div><h2>${escapeHtml(this._config.title)}</h2>${subtitle?`<p>${escapeHtml(subtitle)}</p>`:''}</div><span class="system"><i></i>GREENHOUSE VENTILATION</span></header>
+      ${this._renderGlobalControls()}
       <section class="faces">${this._config.faces.map((face)=>this._renderFace(face)).join('')}</section>
     </div>`;
     this.shadowRoot.querySelectorAll('.face').forEach((element)=>element.addEventListener('click',()=>this._moreInfo(element.dataset.entity)));
     this.shadowRoot.querySelectorAll('.more-info').forEach((button)=>button.addEventListener('click',(event)=>{event.stopPropagation();this._moreInfo(button.dataset.entity)}));
     this.shadowRoot.querySelectorAll('.controls button').forEach((button)=>button.addEventListener('click',(event)=>this._control(event)));
+    this.shadowRoot.querySelectorAll('.global-controls button').forEach((button)=>button.addEventListener('click',(event)=>this._globalControl(event)));
   }
 
   _renderFace(face){

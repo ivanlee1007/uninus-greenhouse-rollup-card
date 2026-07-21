@@ -22,6 +22,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   theme: 'dark',
   items_per_row: 2,
   animation: true,
+  show_global_controls: false,
   unit: '秒',
   status_idle_color: '#8798a2',
   status_moving_color: '#ffd54a',
@@ -70,6 +71,7 @@ export function normalizeConfig(raw = {}) {
       ? Math.max(1, Math.min(4, Math.floor(Number(config.items_per_row))))
       : legacyForceOneByFour === true ? 4 : DEFAULT_CONFIG.items_per_row,
     animation: config.animation !== false,
+    show_global_controls: config.show_global_controls === true,
     faces: FACE_KEYS.map((key, index) => normalizeFace(byKey.get(key) ?? suppliedFaces[index], key)),
   };
   for (const key of ['status_idle_color', 'status_moving_color', 'closed_color', 'open_color']) {
@@ -212,6 +214,19 @@ function resolveIntegrationCoverState(face, cover) {
 
 export function coverServiceForAction(action) {
   return ({ open: 'open_cover', stop: 'stop_cover', close: 'close_cover' })[action] ?? '';
+}
+
+export function resolveGlobalControlTargets(config, states = {}, action) {
+  if (!coverServiceForAction(action)) return [];
+  const targets = new Set();
+  for (const face of normalizeConfig(config).faces) {
+    const state = resolveFaceState(face, states);
+    if (!state.integration || !state.available || !/^cover\.[a-z0-9_]+$/.test(state.controlEntity ?? '')) continue;
+    if (state.supports?.[action] === false) continue;
+    if (action !== 'stop' && state.commandState === 'conflict') continue;
+    targets.add(state.controlEntity);
+  }
+  return [...targets];
 }
 
 export function resolveSubtitle(config, states = {}) {

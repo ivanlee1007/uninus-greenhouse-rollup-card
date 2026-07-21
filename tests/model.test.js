@@ -13,6 +13,7 @@ import {
   isValidColor,
   GRID_OPTIONS,
   coverServiceForAction,
+  resolveGlobalControlTargets,
 } from '../src/model.js';
 
 test('normalizeConfig creates four ordered faces and preserves explicit false', () => {
@@ -23,6 +24,31 @@ test('normalizeConfig creates four ordered faces and preserves explicit false', 
   assert.equal(config.theme, 'light');
   assert.equal(config.items_per_row, 3);
   assert.equal(config.faces[1].name, '南側');
+});
+
+test('global controls stay hidden by default and preserve an explicit opt in', () => {
+  assert.equal(DEFAULT_CONFIG.show_global_controls, false);
+  assert.equal(normalizeConfig({}).show_global_controls, false);
+  assert.equal(normalizeConfig({ show_global_controls: true }).show_global_controls, true);
+  assert.equal(normalizeConfig({ show_global_controls: 'true' }).show_global_controls, false);
+});
+
+test('global control targets include only unique available covers that support the action', () => {
+  const config = normalizeConfig({ faces: [
+    { key: 'east', entity_mode: 'cover_entity', cover_entity: 'cover.east' },
+    { key: 'south', entity_mode: 'cover_entity', cover_entity: 'cover.east' },
+    { key: 'west', entity_mode: 'cover_entity', cover_entity: 'cover.west' },
+    { key: 'north', entity_mode: 'cover_entity', cover_entity: 'cover.north' },
+  ] });
+  const states = {
+    'cover.east': { state: 'open', attributes: { supported_features: 11 } },
+    'cover.west': { state: 'unavailable', attributes: { supported_features: 11 } },
+    'cover.north': { state: 'closed', attributes: { supported_features: 3 } },
+  };
+
+  assert.deepEqual(resolveGlobalControlTargets(config, states, 'open'), ['cover.east', 'cover.north']);
+  assert.deepEqual(resolveGlobalControlTargets(config, states, 'stop'), ['cover.east']);
+  assert.deepEqual(resolveGlobalControlTargets(config, states, 'close'), ['cover.east', 'cover.north']);
 });
 
 test('normalizeConfig preserves legacy mode and explicitly selects integration mode', () => {

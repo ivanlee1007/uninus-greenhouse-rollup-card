@@ -32,6 +32,13 @@ test('README documents the visual editor and exact items per row', async () => {
   assert.doesNotMatch(readme, /force_1x4/);
 });
 
+test('README documents optional global controls and their card-only scope', async () => {
+  const readme = await readFile(new URL('README.md', root), 'utf8');
+  assert.match(readme, /show_global_controls/);
+  assert.match(readme, /全開.*全停.*全關/);
+  assert.match(readme, /只控制.*卡片.*cover/i);
+});
+
 test('card picker metadata links to the standalone card repository', async () => {
   const source = await readFile(new URL('src/index.js', root), 'utf8');
   assert.match(source, /documentationURL:'https:\/\/github\.com\/ivanlee1007\/uninus-greenhouse-rollup-card'/);

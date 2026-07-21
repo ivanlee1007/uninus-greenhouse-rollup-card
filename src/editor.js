@@ -41,6 +41,7 @@ export class UninusGreenhouseRollupCardEditor extends HTMLElement {
         ${this._color('closed_color','關閉區域色',c.closed_color)}${this._color('open_color','開啟／捲軸色',c.open_color)}
         <div class="field"><label>每列捲揚數量（最多 4 個）</label><select data-property="items_per_row" data-number="true">${[1,2,3,4].map((count)=>`<option value="${count}" ${count===c.items_per_row?'selected':''}>${count} 個</option>`).join('')}</select></div>
         <div class="field switch"><label>啟用動畫</label><input type="checkbox" data-property="animation" data-value-type="boolean" ${c.animation?'checked':''}></div>
+        <div class="field switch full"><label>顯示「全開／全停／全關」全域控制</label><input type="checkbox" data-property="show_global_controls" data-value-type="boolean" ${c.show_global_controls?'checked':''}></div>
       </div></section>
       <section class="section"><h3>四面捲揚設定</h3><div class="faces">${c.faces.map((face,index)=>`<details class="face face-editor" ${index===0?'open':''}><summary><span>${escapeHtml(face.compass)}・${escapeHtml(face.name)}</span><span>›</span></summary><div class="body"><div class="grid">
         <div class="field"><label>顯示名稱</label><input data-face="${face.key}" data-property="name" value="${escapeHtml(face.name)}"></div>

@@ -68,6 +68,147 @@ test('integration control click calls the exact cover service without opening Mo
   card.remove();
 });
 
+test('global controls are hidden by default and opt in renders the three requested actions', () => {
+  const { card } = createCard({ state: 'open', attributes: { supported_features: 11 } });
+  assert.equal(card.shadowRoot.querySelector('.global-controls'), null);
+
+  card.setConfig({
+    show_global_controls: true,
+    faces: [{ key: 'east', entity_mode: 'cover_entity', cover_entity: 'cover.east' }],
+  });
+
+  assert.deepEqual(
+    [...card.shadowRoot.querySelectorAll('.global-controls button')].map((button) => button.textContent.trim()),
+    ['全開', '全停', '全關'],
+  );
+  card.remove();
+});
+
+test('global action calls one cover service with every unique controllable card entity', async () => {
+  const calls = [];
+  const { card } = createCard({ state: 'open', attributes: { supported_features: 11 } });
+  card.setConfig({
+    show_global_controls: true,
+    faces: [
+      { key: 'east', entity_mode: 'cover_entity', cover_entity: 'cover.east' },
+      { key: 'south', entity_mode: 'cover_entity', cover_entity: 'cover.south' },
+      { key: 'west', entity_mode: 'cover_entity', cover_entity: 'cover.unavailable' },
+      { key: 'north', entity_mode: 'cover_entity', cover_entity: 'cover.east' },
+    ],
+  });
+  card.hass = {
+    states: {
+      'cover.east': { state: 'open', attributes: { supported_features: 11 } },
+      'cover.south': { state: 'closed', attributes: { supported_features: 11 } },
+      'cover.unavailable': { state: 'unavailable', attributes: { supported_features: 11 } },
+    },
+    callService: async (...args) => calls.push(args),
+  };
+
+  const openAll = card.shadowRoot.querySelector('.global-controls [data-action="open"]');
+  assert.equal(openAll.disabled, false);
+  openAll.click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.deepEqual(calls, [['cover', 'open_cover', { entity_id: ['cover.east', 'cover.south'] }]]);
+  card.remove();
+});
+
+test('global stop remains available while a global direction command is pending', async () => {
+  let finishOpen;
+  const openPending = new Promise((resolve) => { finishOpen = resolve; });
+  const calls = [];
+  const { card } = createCard(
+    { state: 'open', attributes: { supported_features: 11 } },
+    async (domain, service, data) => {
+      calls.push([domain, service, data]);
+      if (service === 'open_cover') await openPending;
+    },
+  );
+  card.setConfig({
+    show_global_controls: true,
+    faces: [{ key: 'east', entity_mode: 'cover_entity', cover_entity: 'cover.east' }],
+  });
+
+  card.shadowRoot.querySelector('.global-open').click();
+  await Promise.resolve();
+  const stopAll = card.shadowRoot.querySelector('.global-stop');
+  assert.equal(stopAll.disabled, false);
+  stopAll.click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.deepEqual(calls.map((call) => call[1]), ['open_cover', 'stop_cover']);
+  finishOpen();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  card.remove();
+});
+
+test('global stop skips an entity with an individual stop pending and preserves its pending UI', async () => {
+  let finishEast;
+  let finishGlobal;
+  let finishSouth;
+  const eastPending = new Promise((resolve) => { finishEast = resolve; });
+  const globalPending = new Promise((resolve) => { finishGlobal = resolve; });
+  const southPending = new Promise((resolve) => { finishSouth = resolve; });
+  const calls = [];
+  const { card } = createCard({ state: 'open', attributes: { supported_features: 11 } });
+  card.setConfig({
+    show_global_controls: true,
+    faces: [
+      { key: 'east', entity_mode: 'cover_entity', cover_entity: 'cover.east' },
+      { key: 'south', entity_mode: 'cover_entity', cover_entity: 'cover.south' },
+    ],
+  });
+  card.hass = {
+    states: {
+      'cover.east': { state: 'open', attributes: { supported_features: 11 } },
+      'cover.south': { state: 'open', attributes: { supported_features: 11 } },
+    },
+    callService: async (domain, service, data) => {
+      calls.push([domain, service, data]);
+      if (data.entity_id === 'cover.east') await eastPending;
+      else if (data.entity_id === 'cover.south') await southPending;
+      else await globalPending;
+    },
+  };
+
+  card.shadowRoot.querySelector('.controls [data-entity="cover.east"][data-action="stop"]').click();
+  await Promise.resolve();
+  const stopAll = card.shadowRoot.querySelector('.global-stop');
+  assert.equal(stopAll.disabled, false);
+  stopAll.click();
+  await Promise.resolve();
+
+  assert.deepEqual(calls, [
+    ['cover', 'stop_cover', { entity_id: 'cover.east' }],
+    ['cover', 'stop_cover', { entity_id: ['cover.south'] }],
+  ]);
+  assert.equal(card.shadowRoot.querySelector('.global-stop').disabled, true);
+
+  finishGlobal();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(card.shadowRoot.querySelector('.controls [data-entity="cover.east"][data-action="stop"]').disabled, true);
+  assert.equal(card.shadowRoot.querySelector('.controls [data-entity="cover.south"][data-action="stop"]').disabled, false);
+  assert.equal(card.shadowRoot.querySelector('.global-stop').disabled, false);
+
+  card.shadowRoot.querySelector('.controls [data-entity="cover.south"][data-action="stop"]').click();
+  await Promise.resolve();
+  const disabledStopAll = card.shadowRoot.querySelector('.global-stop');
+  assert.equal(disabledStopAll.disabled, true);
+  disabledStopAll.click();
+  assert.equal(calls.length, 3);
+
+  finishSouth();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(card.shadowRoot.querySelector('.controls [data-entity="cover.east"][data-action="stop"]').disabled, true);
+  assert.equal(card.shadowRoot.querySelector('.global-stop').disabled, false);
+
+  finishEast();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(card.shadowRoot.querySelector('.controls [data-entity="cover.east"][data-action="stop"]').disabled, false);
+  card.remove();
+});
+
 test('integration controls are disabled when the cover is unavailable', () => {
   const { card } = createCard({ state: 'unavailable', attributes: {} });
   const controls = [...card.shadowRoot.querySelectorAll('.controls button')];
@@ -201,6 +342,24 @@ test('entity pickers render each field label only once', () => {
     assert.equal(outerLabels.length, 0, `${picker.label} has a duplicate outer label`);
     assert.ok(picker.label);
   }
+  editor.remove();
+});
+
+test('editor exposes and persists the global controls visibility switch', () => {
+  const editor = window.document.createElement('uninus-greenhouse-rollup-test-editor');
+  window.document.body.append(editor);
+  editor.setConfig({ show_global_controls: false });
+  editor.hass = { states: {} };
+  let saved;
+  editor.addEventListener('config-changed', (event) => { saved = event.detail.config; });
+
+  const toggle = editor.shadowRoot.querySelector('[data-property="show_global_controls"]');
+  assert.ok(toggle);
+  assert.equal(toggle.hasAttribute('checked'), false);
+  toggle.checked = true;
+  toggle.dispatchEvent(new window.Event('change', { bubbles: true }));
+
+  assert.equal(saved.show_global_controls, true);
   editor.remove();
 });
 
@@ -344,5 +503,17 @@ test('closed color editor setting drives the rendered curtain color token', () =
 
   assert.match(card.shadowRoot.innerHTML, /--closed-color:#123456/);
   assert.match(card.shadowRoot.innerHTML, /var\(--closed-color\)/);
+  card.remove();
+});
+
+test('global open control inherits the configured open color token', () => {
+  const { card } = createCard({ state: 'open', attributes: { supported_features: 11 } });
+  card.setConfig({
+    open_color: '#123456',
+    show_global_controls: true,
+    faces: [{ key: 'east', entity_mode: 'cover_entity', cover_entity: 'cover.east' }],
+  });
+
+  assert.match(card.shadowRoot.querySelector('.rollup-card').getAttribute('style'), /--open-color:#123456/);
   card.remove();
 });
