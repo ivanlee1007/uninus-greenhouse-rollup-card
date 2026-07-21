@@ -46,6 +46,14 @@ test('README documents adaptive card-width layout and mobile touch behavior', as
   assert.match(readme, /手機.*單欄.*44px/s);
 });
 
+test('README documents bounded eyesight-friendly typography and icon scaling', async () => {
+  const readme = await readFile(new URL('README.md', root), 'utf8');
+  assert.match(readme, /視力友善.*字體.*icon/s);
+  assert.match(readme, /1 欄.*16px.*40px.*44px/s);
+  assert.match(readme, /4 欄.*12px.*28px.*34px/s);
+  assert.match(readme, /高度.*自然延展.*不.*縮小字體/s);
+});
+
 test('card picker metadata links to the standalone card repository', async () => {
   const source = await readFile(new URL('src/index.js', root), 'utf8');
   assert.match(source, /documentationURL:'https:\/\/github\.com\/ivanlee1007\/uninus-greenhouse-rollup-card'/);

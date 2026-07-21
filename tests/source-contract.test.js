@@ -46,6 +46,19 @@ test('all three global controls share one action accent without status-color ove
 test('single-column mobile layout provides touch-sized cover and global controls', async () => {
   const text = await source('src/card.js');
   assert.match(text, /\.columns-1 \.global-controls button,\.columns-1 \.controls button\{min-height:44px/);
+  assert.doesNotMatch(text, /\.columns-1 \.global-controls button,\.columns-1 \.controls button\{[^}]*font-size:\d/);
+});
+
+test('column layouts expose bounded readable type icon and control size profiles', async () => {
+  const text = await source('src/card.js');
+  assert.match(text, /\.header h2\{[^}]*font-size:clamp\(18px,[^,]+,24px\)/);
+  assert.match(text, /\.columns-1\{[^}]*--ui-name-size:clamp\(16px,[^,]+,21px\)[^}]*--ui-icon-size:40px[^}]*--ui-control-size:13px[^}]*--ui-control-height:44px/);
+  assert.match(text, /\.columns-2\{[^}]*--ui-name-size:clamp\(14px,[^,]+,17px\)[^}]*--ui-icon-size:34px[^}]*--ui-control-size:12px[^}]*--ui-control-height:38px/);
+  assert.match(text, /\.columns-3\{[^}]*--ui-name-size:clamp\(13px,[^,]+,15px\)[^}]*--ui-icon-size:30px[^}]*--ui-control-size:11px[^}]*--ui-control-height:36px/);
+  assert.match(text, /\.columns-4\{[^}]*--ui-name-size:clamp\(12px,[^,]+,14px\)[^}]*--ui-icon-size:28px[^}]*--ui-control-size:11px[^}]*--ui-control-height:34px/);
+  assert.match(text, /\.compass\{[^}]*width:var\(--ui-icon-size\)[^}]*height:var\(--ui-icon-size\)/);
+  assert.match(text, /\.name\{[^}]*font-size:var\(--ui-name-size\)/);
+  assert.match(text, /\.controls button\{[^}]*min-height:var\(--ui-control-height\)[^}]*font-size:var\(--ui-control-size\)/);
 });
 
 test('card respects reduced motion and uses namespaced effect classes', async () => {
