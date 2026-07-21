@@ -141,6 +141,27 @@ test('integration cover safely reports unknown and unavailable positions', () =>
   assert.equal(unavailable.available, false);
 });
 
+test('uncalibrated managed Cover stays controllable when HA reports an unknown state', () => {
+  const state = resolveFaceState({ cover_entity: 'cover.wen_shi_juan_yang' }, {
+    'cover.wen_shi_juan_yang': {
+      state: 'unknown',
+      attributes: {
+        is_closed: null,
+        position_confidence: 'unknown',
+        command_state: 'idle',
+        position_is_estimated: true,
+        supported_features: 11,
+      },
+    },
+  });
+
+  assert.equal(state.available, true);
+  assert.equal(state.positionKnown, false);
+  assert.equal(state.positionLabel, '位置尚未校正');
+  assert.equal(state.commandLabel, '沒有控制命令');
+  assert.deepEqual(state.supports, { open: true, close: true, stop: true });
+});
+
 test('managed Cover with unknown position does not claim a closing endpoint', () => {
   const state = resolveFaceState({ cover_entity: 'cover.unknown' }, {
     'cover.unknown': {

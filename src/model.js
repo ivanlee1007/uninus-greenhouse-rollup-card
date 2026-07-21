@@ -129,7 +129,6 @@ export function resolveFaceState(face, states = {}) {
 
 function resolveIntegrationCoverState(face, cover) {
   const entityState = String(cover.state ?? '').toLowerCase();
-  const available = !['unavailable', 'unknown'].includes(entityState);
   const positionValue = cover.attributes?.current_position;
   const rawPosition = positionValue === null || positionValue === undefined || positionValue === ''
     ? Number.NaN
@@ -140,6 +139,8 @@ function resolveIntegrationCoverState(face, cover) {
   const commandState = managedCover
     ? String(cover.attributes?.command_state ?? entityState).toLowerCase()
     : entityState;
+  const available = entityState !== 'unavailable'
+    && (managedCover ? commandState !== 'unavailable' : entityState !== 'unknown');
   const confidence = managedCover
     ? String(cover.attributes?.position_confidence ?? 'unknown').toLowerCase()
     : '';

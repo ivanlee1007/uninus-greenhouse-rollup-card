@@ -1,6 +1,6 @@
 {
   "name": "uninus-greenhouse-rollup-card",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Standalone Home Assistant Lovelace card for greenhouse roll-up covers",
   "type": "module",
   "main": "uninus-greenhouse-rollup-card.js",
