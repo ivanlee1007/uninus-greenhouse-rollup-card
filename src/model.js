@@ -274,10 +274,22 @@ export function configForSave(config) {
 }
 
 const THEME_TOKENS = Object.freeze({
-  dark: { background: 'linear-gradient(145deg,#172229,#080e12)', surface: 'rgba(39,52,60,.92)', text: '#f5f8fa', muted: 'rgba(218,230,236,.58)', frame: '#111c22' },
-  light: { background: 'linear-gradient(145deg,#f7faf8,#dfe9e5)', surface: 'rgba(255,255,255,.82)', text: '#183028', muted: 'rgba(24,48,40,.62)', frame: '#d2dfda' },
-  greenhouse: { background: 'linear-gradient(145deg,#123a32,#071e1a)', surface: 'rgba(27,78,66,.74)', text: '#f2fff9', muted: 'rgba(210,246,231,.64)', frame: '#0c2924' },
-  sand: { background: 'linear-gradient(145deg,#fff2cd,#d8b875)', surface: 'rgba(255,250,235,.72)', text: '#3d2d17', muted: 'rgba(61,45,23,.62)', frame: '#ae8a49' },
+  dark: {
+    background: 'radial-gradient(circle at 12% -8%,rgba(104,128,135,.22),transparent 38%),linear-gradient(155deg,#192329 0%,#10171b 58%,#0a0f12 100%)',
+    surface: 'rgba(31,43,48,.9)', text: '#eef3f2', muted: '#b8c8c5', frame: '#10191d', shadow: 'rgba(2,8,10,.38)',
+  },
+  light: {
+    background: 'radial-gradient(circle at 10% -12%,rgba(255,255,255,.96),transparent 42%),linear-gradient(155deg,#f2f5f3 0%,#e7ece9 58%,#dde5e1 100%)',
+    surface: 'rgba(255,255,255,.78)', text: '#21312e', muted: '#4f605b', frame: '#d5dfdb', shadow: 'rgba(39,61,54,.15)',
+  },
+  greenhouse: {
+    background: 'radial-gradient(circle at 14% -10%,rgba(104,148,128,.24),transparent 40%),linear-gradient(155deg,#1b382f 0%,#132a23 58%,#0d1e19 100%)',
+    surface: 'rgba(31,67,56,.84)', text: '#eff7f2', muted: '#b9cec4', frame: '#10271f', shadow: 'rgba(5,26,19,.34)',
+  },
+  sand: {
+    background: 'radial-gradient(circle at 12% -10%,rgba(255,255,255,.56),transparent 42%),linear-gradient(155deg,#eee9df 0%,#e2d8c9 58%,#d7cab7 100%)',
+    surface: 'rgba(250,247,241,.78)', text: '#3d352b', muted: '#66594c', frame: '#d2c5b2', shadow: 'rgba(72,54,32,.16)',
+  },
 });
 
 export function resolveThemeTokens(config) {
@@ -287,8 +299,8 @@ export function resolveThemeTokens(config) {
 }
 
 export const THEME_OPTIONS = Object.freeze([
-  { value: 'dark', label: '原始暗色' },
-  { value: 'light', label: '明亮霧白' },
-  { value: 'greenhouse', label: '溫室青綠' },
-  { value: 'sand', label: '日光暖沙' },
+  { value: 'dark', label: '深夜石墨' },
+  { value: 'light', label: '雲霧白' },
+  { value: 'greenhouse', label: '森林深綠' },
+  { value: 'sand', label: '暖陶米' },
 ]);

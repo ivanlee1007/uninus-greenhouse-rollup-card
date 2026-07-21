@@ -37,6 +37,12 @@ test('integration faces expose explicit open stop close controls through cover s
   }
 });
 
+test('all three global controls share one action accent without status-color overrides', async () => {
+  const text = await source('src/card.js');
+  assert.match(text, /\.global-controls button\{[^}]*--global-accent:var\(--open-color\)/);
+  assert.doesNotMatch(text, /\.global-(?:open|stop|close)\{--global-accent:/);
+});
+
 test('card respects reduced motion and uses namespaced effect classes', async () => {
   const text = await source('src/card.js');
   assert.match(text, /prefers-reduced-motion/);

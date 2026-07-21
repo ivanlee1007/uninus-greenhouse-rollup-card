@@ -14,7 +14,32 @@ import {
   GRID_OPTIONS,
   coverServiceForAction,
   resolveGlobalControlTargets,
+  THEME_OPTIONS,
 } from '../src/model.js';
+
+function hexRgb(value) {
+  return [1, 3, 5].map((offset) => Number.parseInt(value.slice(offset, offset + 2), 16) / 255);
+}
+
+function rgba(value) {
+  const match = value.match(/^rgba\((\d+),(\d+),(\d+),([\d.]+)\)$/);
+  assert.ok(match, `invalid rgba token: ${value}`);
+  return [Number(match[1]) / 255, Number(match[2]) / 255, Number(match[3]) / 255, Number(match[4])];
+}
+
+function composite([red, green, blue, alpha], background) {
+  return [red, green, blue].map((channel, index) => alpha * channel + (1 - alpha) * background[index]);
+}
+
+function luminance(color) {
+  const linear = color.map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
+}
+
+function contrastRatio(foreground, background) {
+  const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+  return (values[0] + 0.05) / (values[1] + 0.05);
+}
 
 test('normalizeConfig creates four ordered faces and preserves explicit false', () => {
   const config = normalizeConfig({ animation: false, theme: 'light', items_per_row: 3, faces: [{ key: 'east', name: '東溫室' }] });
@@ -438,4 +463,34 @@ test('resolveThemeTokens exposes distinct light and dark surfaces with custom ba
   const custom = resolveThemeTokens(normalizeConfig({ theme: 'light', background_color: '#abcdef' }));
   assert.notEqual(dark.background, light.background);
   assert.equal(custom.background, '#abcdef');
+});
+
+test('the four background atmospheres form one restrained layered design system', () => {
+  assert.deepEqual(THEME_OPTIONS, [
+    { value: 'dark', label: '深夜石墨' },
+    { value: 'light', label: '雲霧白' },
+    { value: 'greenhouse', label: '森林深綠' },
+    { value: 'sand', label: '暖陶米' },
+  ]);
+
+  const backgrounds = THEME_OPTIONS.map(({ value }) => resolveThemeTokens(normalizeConfig({ theme: value })).background);
+  assert.equal(new Set(backgrounds).size, 4);
+  for (const background of backgrounds) {
+    assert.match(background, /radial-gradient/);
+    assert.match(background, /linear-gradient/);
+  }
+});
+
+test('small muted copy keeps WCAG AA contrast on every themed surface', () => {
+  for (const { value } of THEME_OPTIONS) {
+    const tokens = resolveThemeTokens(normalizeConfig({ theme: value }));
+    assert.match(tokens.muted, /^#[0-9a-f]{6}$/i);
+    const foreground = hexRgb(tokens.muted);
+    const surface = rgba(tokens.surface);
+    const backgroundStops = [...tokens.background.matchAll(/#[0-9a-f]{6}/gi)].map(([color]) => hexRgb(color));
+    assert.ok(backgroundStops.length >= 2);
+    for (const background of backgroundStops) {
+      assert.ok(contrastRatio(foreground, composite(surface, background)) >= 4.5, `${value} muted copy is below 4.5:1`);
+    }
+  }
 });
