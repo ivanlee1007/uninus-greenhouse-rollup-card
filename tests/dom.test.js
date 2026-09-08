@@ -383,14 +383,15 @@ test('editor exposes and persists adaptive items per row', () => {
   editor.remove();
 });
 
-test('new cards default every face to Integration Cover mode', () => {
+test('new cards default every item to standard Cover mode', () => {
   const config = UninusGreenhouseRollupCard.getStubConfig();
 
-  assert.equal(config.faces.length, 4);
-  assert.ok(config.faces.every((face) => face.entity_mode === 'cover_entity'));
-  assert.ok(config.faces.every((face) => face.cover_entity === ''));
-  assert.ok(config.faces.every((face) => face.entity === ''));
-  assert.ok(config.faces.every((face) => face.motion_entity === ''));
+  assert.equal(config.items.length, 4);
+  assert.ok(config.items.every((item) => item.entity_mode === 'cover_entity'));
+  assert.ok(config.items.every((item) => item.cover_entity === ''));
+  assert.ok(config.items.every((item) => item.entity === ''));
+  assert.ok(config.items.every((item) => item.motion_entity === ''));
+  assert.equal('faces' in config, false);
 });
 
 test('Integration Cover mode hides every legacy-only editor field', () => {
@@ -440,7 +441,7 @@ test('Integration Cover mode immediately identifies faces without a cover entity
   const errors = [...editor.shadowRoot.querySelectorAll('[role="alert"]')];
   assert.equal(errors.length, 1);
   assert.match(errors[0].textContent, /標準 Cover Entity/);
-  assert.equal(errors[0].closest('.face-editor').querySelector('[data-face="east"]') !== null, true);
+  assert.equal(errors[0].closest('.item-editor').querySelector('[data-item="east"]') !== null, true);
   editor.remove();
 });
 
@@ -471,12 +472,12 @@ test('switching a face to Integration Cover removes persisted legacy fields', ()
   let saved;
   editor.addEventListener('config-changed', (event) => { saved = event.detail.config; });
 
-  const mode = editor.shadowRoot.querySelector('[data-face="east"][data-property="entity_mode"]');
+  const mode = editor.shadowRoot.querySelector('[data-item="east"][data-property="entity_mode"]');
   mode.querySelector('[value="position_entity"]').removeAttribute('selected');
   mode.querySelector('[value="cover_entity"]').setAttribute('selected', '');
   mode.dispatchEvent(new window.Event('change', { bubbles: true }));
 
-  const east = saved.faces.find((face) => face.key === 'east');
+  const east = saved.items.find((item) => item.id === 'east');
   assert.equal(east.cover_entity, 'cover.east');
   for (const property of ['entity', 'motion_entity', 'max_entity', 'max_value']) {
     assert.equal(property in east, false, property);
@@ -492,10 +493,10 @@ test('selecting a cover adopts its friendly name unless the face name was custom
   let saved;
   editor.addEventListener('config-changed', (event) => { saved = event.detail.config; });
 
-  const picker = editor.shadowRoot.querySelector('[data-face="east"][data-property="cover_entity"]');
+  const picker = editor.shadowRoot.querySelector('[data-item="east"][data-property="cover_entity"]');
   picker.dispatchEvent(new window.CustomEvent('value-changed', { detail: { value: 'cover.east' }, bubbles: true }));
 
-  assert.equal(saved.faces.find((face) => face.key === 'east').name, '東側溫室捲揚');
+  assert.equal(saved.items.find((item) => item.id === 'east').name, '東側溫室捲揚');
   editor.remove();
 });
 
@@ -536,4 +537,163 @@ test('global open control inherits the configured open color token', () => {
 
   assert.match(card.shadowRoot.querySelector('.rollup-card').getAttribute('style'), /--open-color:#123456/);
   card.remove();
+});
+
+test('card renders every arbitrary item with kind-specific generic semantics', () => {
+  const { card } = createCard({ state: 'open', attributes: { current_position: 100 } });
+  card.setConfig({ items: [
+    { id: 'wall', name: 'North wall', kind: 'rollup', direction: 'N', cover_entity: 'cover.east' },
+    { id: 'roof', name: 'Roof hatch', kind: 'skylight', label: 'Bay 2', cover_entity: 'cover.east' },
+    { id: 'screen', name: 'Heat screen', kind: 'shade', icon: 'mdi:blinds-horizontal', cover_entity: 'cover.east' },
+    { id: 'extra-1', name: 'Extra 1', cover_entity: 'cover.east' },
+    { id: 'extra-2', name: 'Extra 2', cover_entity: 'cover.east' },
+  ] });
+
+  assert.equal(card.shadowRoot.querySelectorAll('.cover-item').length, 5);
+  assert.ok(card.shadowRoot.querySelector('.kind-rollup'));
+  assert.ok(card.shadowRoot.querySelector('.kind-skylight'));
+  assert.ok(card.shadowRoot.querySelector('.kind-shade'));
+  assert.match(card.shadowRoot.innerHTML, /mdi:window-open-variant/);
+  assert.match(card.shadowRoot.innerHTML, /mdi:blinds-horizontal/);
+  assert.match(card.shadowRoot.querySelector('.kind-skylight .scene').getAttribute('aria-label'), /天窗/);
+  assert.doesNotMatch(card.shadowRoot.innerHTML, /North wall捲揚|Roof hatch捲揚|Heat screen捲揚/);
+  card.remove();
+});
+
+test('optional group controls invoke only unique safe covers in that group', async () => {
+  const calls = [];
+  const { card } = createCard({ state: 'open', attributes: { supported_features: 11 } });
+  card.setConfig({ show_group_controls: true, items: [
+    { id: 'roof-a', name: 'A', group: 'Roof', cover_entity: 'cover.east' },
+    { id: 'roof-b', name: 'B', group: 'Roof', cover_entity: 'cover.east' },
+    { id: 'wall', name: 'Wall', group: 'Wall', cover_entity: 'cover.south' },
+  ] });
+  card.hass = {
+    states: {
+      'cover.east': { state: 'open', attributes: { supported_features: 11 } },
+      'cover.south': { state: 'open', attributes: { supported_features: 11 } },
+    },
+    callService: async (...args) => calls.push(args),
+  };
+
+  const roofOpen = card.shadowRoot.querySelector('.group-controls[data-group="Roof"] [data-action="open"]');
+  assert.ok(roofOpen);
+  roofOpen.click();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(calls, [['cover', 'open_cover', { entity_id: ['cover.east'] }]]);
+  card.remove();
+});
+
+test('group controls expose pending direction and stop states', async () => {
+  let finishOpen;
+  let finishStop;
+  const openPending = new Promise((resolve) => { finishOpen = resolve; });
+  const stopPending = new Promise((resolve) => { finishStop = resolve; });
+  const { card } = createCard({ state: 'open', attributes: { supported_features: 11 } });
+  card.setConfig({
+    show_group_controls: true,
+    items: [{ id: 'roof', name: 'Roof', group: 'Roof', cover_entity: 'cover.east' }],
+  });
+  card.hass = {
+    states: { 'cover.east': { state: 'open', attributes: { supported_features: 11 } } },
+    callService: async (_domain, service) => {
+      if (service === 'open_cover') await openPending;
+      if (service === 'stop_cover') await stopPending;
+    },
+  };
+
+  card.shadowRoot.querySelector('.group-controls [data-action="open"]').click();
+  await Promise.resolve();
+  assert.equal(card.shadowRoot.querySelector('.group-controls [data-action="open"]').disabled, true);
+  assert.equal(card.shadowRoot.querySelector('.group-controls [data-action="close"]').disabled, true);
+  assert.equal(card.shadowRoot.querySelector('.group-controls [data-action="stop"]').disabled, false);
+
+  card.shadowRoot.querySelector('.group-controls [data-action="stop"]').click();
+  await Promise.resolve();
+  assert.equal(card.shadowRoot.querySelector('.group-controls [data-action="stop"]').disabled, true);
+
+  finishStop();
+  finishOpen();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  card.remove();
+});
+
+test('editor can add delete and reorder arbitrary items and saves items only', () => {
+  const editor = window.document.createElement('uninus-greenhouse-rollup-test-editor');
+  window.document.body.append(editor);
+  editor.setConfig({ items: [
+    { id: 'first', name: 'First', cover_entity: 'cover.first' },
+    { id: 'second', name: 'Second', cover_entity: 'cover.second' },
+  ] });
+  editor.hass = { states: {} };
+  const saves = [];
+  editor.addEventListener('config-changed', (event) => saves.push(event.detail.config));
+
+  editor.shadowRoot.querySelector('[data-action="move-down"][data-item="first"]').click();
+  assert.deepEqual(saves.at(-1).items.map(({ id }) => id), ['second', 'first']);
+  editor.shadowRoot.querySelector('[data-action="delete"][data-item="second"]').click();
+  assert.deepEqual(saves.at(-1).items.map(({ id }) => id), ['first']);
+  editor.shadowRoot.querySelector('[data-action="add-item"]').click();
+  assert.equal(saves.at(-1).items.length, 2);
+  assert.equal('faces' in saves.at(-1), false);
+  editor.remove();
+});
+
+test('editor exposes generic item fields and permits an empty item list', () => {
+  const editor = window.document.createElement('uninus-greenhouse-rollup-test-editor');
+  window.document.body.append(editor);
+  editor.setConfig({ items: [] });
+  editor.hass = { states: {} };
+  assert.equal(editor.shadowRoot.querySelectorAll('.item-editor').length, 0);
+  assert.ok(editor.shadowRoot.querySelector('[data-action="add-item"]'));
+
+  editor.setConfig({ items: [{ id: 'roof', name: 'Roof', kind: 'skylight', group: 'A', direction: 'UP', cover_entity: 'cover.roof' }] });
+  for (const property of ['name', 'kind', 'group', 'direction', 'cover_entity']) {
+    assert.ok(editor.shadowRoot.querySelector(`[data-item="roof"][data-property="${property}"]`), property);
+  }
+  assert.doesNotMatch(editor.shadowRoot.innerHTML, /四面捲揚設定/);
+  editor.remove();
+});
+
+test('editor persists generic kind group direction name and cover entity fields', () => {
+  const editor = window.document.createElement('uninus-greenhouse-rollup-test-editor');
+  window.document.body.append(editor);
+  editor.setConfig({ items: [{ id: 'roof', name: 'Roof', cover_entity: 'cover.old' }] });
+  editor.hass = { states: { 'cover.new': { attributes: { friendly_name: 'New roof' } } } };
+  const saves = [];
+  editor.addEventListener('config-changed', (event) => saves.push(event.detail.config));
+
+  const kind = editor.shadowRoot.querySelector('[data-item="roof"][data-property="kind"]');
+  kind.querySelector('[value="rollup"]').removeAttribute('selected');
+  kind.querySelector('[value="skylight"]').setAttribute('selected', '');
+  kind.dispatchEvent(new window.Event('change', { bubbles: true }));
+  for (const [property, value] of [['group', 'Bay A'], ['direction', 'UP'], ['name', 'Custom roof']]) {
+    const field = editor.shadowRoot.querySelector(`[data-item="roof"][data-property="${property}"]`);
+    field.value = value;
+    field.dispatchEvent(new window.Event('change', { bubbles: true }));
+  }
+  const picker = editor.shadowRoot.querySelector('[data-item="roof"][data-property="cover_entity"]');
+  picker.dispatchEvent(new window.CustomEvent('value-changed', { detail: { value: 'cover.new' }, bubbles: true }));
+
+  const roof = saves.at(-1).items[0];
+  assert.equal(roof.kind, 'skylight');
+  assert.equal(roof.group, 'Bay A');
+  assert.equal(roof.direction, 'UP');
+  assert.equal(roof.name, 'Custom roof');
+  assert.equal(roof.cover_entity, 'cover.new');
+  editor.remove();
+});
+
+test('editor exposes and persists optional grouped controls', () => {
+  const editor = window.document.createElement('uninus-greenhouse-rollup-test-editor');
+  window.document.body.append(editor);
+  editor.setConfig({ items: [], show_group_controls: false });
+  let saved;
+  editor.addEventListener('config-changed', (event) => { saved = event.detail.config; });
+  const toggle = editor.shadowRoot.querySelector('[data-property="show_group_controls"]');
+  assert.ok(toggle);
+  toggle.checked = true;
+  toggle.dispatchEvent(new window.Event('change', { bubbles: true }));
+  assert.equal(saved.show_group_controls, true);
+  editor.remove();
 });

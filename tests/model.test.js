@@ -15,7 +15,105 @@ import {
   coverServiceForAction,
   resolveGlobalControlTargets,
   THEME_OPTIONS,
+  addItem,
+  deleteItem,
+  moveItem,
+  configForSave,
 } from '../src/model.js';
+
+test('normalizes arbitrary ordered items without imposing four faces', () => {
+  const supplied = Array.from({ length: 7 }, (_, index) => ({
+    id: `vent-${index}`,
+    name: `Vent ${index}`,
+    kind: index % 2 ? 'skylight' : 'shade',
+    cover_entity: `cover.vent_${index}`,
+  }));
+  const config = normalizeConfig({ items: supplied });
+
+  assert.equal(config.items.length, 7);
+  assert.deepEqual(config.items.map(({ id }) => id), supplied.map(({ id }) => id));
+  assert.deepEqual(config.items.map(({ name }) => name), supplied.map(({ name }) => name));
+  assert.equal('faces' in config, false);
+});
+
+test('migrates legacy faces in compass order and saves only items', () => {
+  const migrated = normalizeConfig({ faces: [
+    { key: 'west', name: 'West legacy', entity: 'sensor.west' },
+    { key: 'east', name: 'East legacy', cover_entity: 'cover.east' },
+  ] });
+
+  assert.deepEqual(migrated.items.map(({ id }) => id), FACE_KEYS);
+  assert.deepEqual(migrated.items.map(({ name }) => name), ['East legacy', '南側', 'West legacy', '北側']);
+  assert.equal(migrated.items[0].direction, 'E');
+  assert.equal(migrated.items[2].entity_mode, 'position_entity');
+  const saved = configForSave(migrated);
+  assert.equal('faces' in saved, false);
+  assert.ok(Array.isArray(saved.items));
+  assert.ok(saved.items.every((item) => !Object.hasOwn(item, 'key')));
+});
+
+test('legacy migration fills unkeyed faces into remaining compass slots', () => {
+  const migrated = normalizeConfig({ faces: [
+    { key: 'east', name: 'East keyed' },
+    { name: 'South positional' },
+    { key: 'west', name: 'West keyed' },
+    { name: 'North positional' },
+  ] });
+
+  assert.deepEqual(migrated.items.map(({ name }) => name), [
+    'East keyed',
+    'South positional',
+    'West keyed',
+    'North positional',
+  ]);
+});
+
+test('normalizes item kind metadata and creates stable unique ids', () => {
+  const config = normalizeConfig({ items: [
+    { id: 'roof', kind: 'skylight', name: 'Roof', direction: 'UP', label: 'Zone A', icon: 'mdi:window-shutter-open', accent_color: '#123456', group: 'roof' },
+    { id: 'roof', kind: 'invalid', name: 'Duplicate' },
+    { name: 'Unnamed id' },
+  ] });
+
+  assert.equal(config.items[0].kind, 'skylight');
+  assert.equal(config.items[0].direction, 'UP');
+  assert.equal(config.items[0].label, 'Zone A');
+  assert.equal(config.items[0].icon, 'mdi:window-shutter-open');
+  assert.equal(config.items[0].group, 'roof');
+  assert.equal(config.items[1].kind, 'rollup');
+  assert.equal(new Set(config.items.map(({ id }) => id)).size, 3);
+  assert.ok(config.items.every(({ id }) => id.length > 0));
+});
+
+test('item editor operations add delete and reorder without a count limit', () => {
+  let config = normalizeConfig({ items: Array.from({ length: 8 }, (_, index) => ({ id: `item-${index}`, name: `${index}` })) });
+  config = addItem(config);
+  assert.equal(config.items.length, 9);
+  const addedId = config.items.at(-1).id;
+  config = moveItem(config, addedId, -1);
+  assert.equal(config.items.at(-2).id, addedId);
+  config = deleteItem(config, 'item-0');
+  assert.equal(config.items.length, 8);
+  assert.equal(config.items.some(({ id }) => id === 'item-0'), false);
+});
+
+test('global targets can be scoped to an item group while deduping safe covers', () => {
+  const config = normalizeConfig({ items: [
+    { id: 'a', group: 'roof', cover_entity: 'cover.shared' },
+    { id: 'b', group: 'roof', cover_entity: 'cover.shared' },
+    { id: 'c', group: 'wall', cover_entity: 'cover.wall' },
+    { id: 'd', group: 'roof', cover_entity: 'cover.conflict' },
+  ] });
+  const states = {
+    'cover.shared': { state: 'open', attributes: { supported_features: 11 } },
+    'cover.wall': { state: 'open', attributes: { supported_features: 11 } },
+    'cover.conflict': { state: 'open', attributes: { supported_features: 11, position_is_estimated: true, command_state: 'conflict' } },
+  };
+
+  assert.deepEqual(resolveGlobalControlTargets(config, states, 'open', 'roof'), ['cover.shared']);
+  assert.deepEqual(resolveGlobalControlTargets(config, states, 'stop', 'roof'), ['cover.shared', 'cover.conflict']);
+  assert.deepEqual(resolveGlobalControlTargets(config, states, 'open'), ['cover.shared', 'cover.wall']);
+});
 
 function hexRgba(value) {
   const match = value.match(/^#([0-9a-f]{6})([0-9a-f]{2})?$/i);
@@ -57,15 +155,17 @@ function contrastRatio(foreground, background) {
 
 test('normalizeConfig creates four ordered faces and preserves explicit false', () => {
   const config = normalizeConfig({ animation: false, theme: 'light', items_per_row: 3, faces: [{ key: 'east', name: '東溫室' }] });
-  assert.deepEqual(config.faces.map((face) => face.key), FACE_KEYS);
-  assert.equal(config.faces[0].name, '東溫室');
+  assert.deepEqual(config.items.map((face) => face.key), FACE_KEYS);
+  assert.equal(config.items[0].name, '東溫室');
   assert.equal(config.animation, false);
   assert.equal(config.theme, 'light');
   assert.equal(config.items_per_row, 3);
-  assert.equal(config.faces[1].name, '南側');
+  assert.equal(config.items[1].name, '南側');
 });
 
 test('global controls stay hidden by default and preserve an explicit opt in', () => {
+  assert.equal(DEFAULT_CONFIG.title, '溫室 Cover 控制');
+  assert.match(DEFAULT_CONFIG.subtitle, /捲揚.*天窗.*遮陰/);
   assert.equal(DEFAULT_CONFIG.show_global_controls, false);
   assert.equal(normalizeConfig({}).show_global_controls, false);
   assert.equal(normalizeConfig({ show_global_controls: true }).show_global_controls, true);
@@ -92,14 +192,14 @@ test('global control targets include only unique available covers that support t
 
 test('normalizeConfig preserves legacy mode and explicitly selects integration mode', () => {
   const legacy = normalizeConfig({ faces: [{ key: 'east', entity: 'sensor.east' }] });
-  assert.equal(legacy.faces[0].entity_mode, 'position_entity');
+  assert.equal(legacy.items[0].entity_mode, 'position_entity');
 
   const inferred = normalizeConfig({ faces: [{ key: 'east', cover_entity: 'cover.east' }] });
-  assert.equal(inferred.faces[0].entity_mode, 'cover_entity');
+  assert.equal(inferred.items[0].entity_mode, 'cover_entity');
 
   const explicitLegacy = normalizeConfig({ faces: [{ key: 'east', entity_mode: 'position_entity', cover_entity: 'cover.east', entity: 'sensor.east' }] });
-  assert.equal(explicitLegacy.faces[0].entity_mode, 'position_entity');
-  assert.equal(resolveFaceState(explicitLegacy.faces[0], {
+  assert.equal(explicitLegacy.items[0].entity_mode, 'position_entity');
+  assert.equal(resolveFaceState(explicitLegacy.items[0], {
     'cover.east': { state: 'opening', attributes: { current_position: 80 } },
     'sensor.east': { state: '10', attributes: {} },
   }).integration, false);
@@ -461,9 +561,9 @@ test('grid options use intrinsic height so responsive rows are never clipped', (
 test('updateFaceConfig only changes the requested face', () => {
   const config = normalizeConfig({});
   const next = updateFaceConfig(config, 'west', 'entity', 'sensor.west');
-  assert.equal(next.faces.find((face) => face.key === 'west').entity, 'sensor.west');
-  assert.equal(next.faces.find((face) => face.key === 'east').entity, '');
-  assert.notEqual(next.faces, config.faces);
+  assert.equal(next.items.find((face) => face.key === 'west').entity, 'sensor.west');
+  assert.equal(next.items.find((face) => face.key === 'east').entity, '');
+  assert.notEqual(next.items, config.items);
 });
 
 test('isValidColor accepts CSS color formats used by the editor', () => {
@@ -485,8 +585,8 @@ test('applyEditorChange preserves boolean false and color strings', () => {
 test('applyEditorChange updates a nested face without mutating siblings', () => {
   const config = normalizeConfig({});
   const next = applyEditorChange(config, { faceKey: 'north', property: 'name', value: '北側上層' });
-  assert.equal(next.faces[3].name, '北側上層');
-  assert.equal(next.faces[0].name, '東側');
+  assert.equal(next.items[3].name, '北側上層');
+  assert.equal(next.items[0].name, '東側');
 });
 
 test('resolveThemeTokens exposes distinct light and dark surfaces with custom background override', () => {

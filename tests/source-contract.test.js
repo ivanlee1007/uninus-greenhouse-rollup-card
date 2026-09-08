@@ -22,15 +22,15 @@ test('card uses inline containment so responsive rows keep intrinsic height', as
   assert.doesNotMatch(text, /cqh/);
 });
 
-test('editor exposes adaptive layout, optional global controls, subtitle, per-face entity and color controls', async () => {
+test('editor exposes adaptive layout, grouped controls, subtitle, and arbitrary item fields', async () => {
   const text = await source('src/editor.js');
-  for (const marker of ['subtitle_attribute', 'items_per_row', '每列捲揚數量', 'show_global_controls', '全開／全停／全關', 'status_moving_color', 'background_color', 'cover_entity', '標準 Cover Entity', 'motion_entity', 'max_entity', 'accent_color', 'ha-entity-picker', 'config-changed']) {
+  for (const marker of ['subtitle_attribute', 'items_per_row', '每列項目數量', 'show_global_controls', 'show_group_controls', '全開／全停／全關', 'status_moving_color', 'background_color', 'cover_entity', '標準 Cover Entity', 'motion_entity', 'max_entity', 'accent_color', 'kind', 'group', 'direction', 'add-item', 'delete', 'move-up', 'move-down', 'ha-entity-picker', 'config-changed']) {
     assert.match(text, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
   assert.doesNotMatch(text, /force_1x4/);
 });
 
-test('integration faces expose explicit open stop close controls through cover services', async () => {
+test('standard Cover items expose explicit open stop close controls through cover services', async () => {
   const text = await source('src/card.js');
   for (const marker of ['data-action="open"', 'data-action="stop"', 'data-action="close"', "callService('cover'", 'coverServiceForAction', 'commandLabel', 'confidenceLabel']) {
     assert.match(text, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
@@ -39,7 +39,7 @@ test('integration faces expose explicit open stop close controls through cover s
 
 test('all three global controls share one action accent without status-color overrides', async () => {
   const text = await source('src/card.js');
-  assert.match(text, /\.global-controls button\{[^}]*--global-accent:var\(--rollup-ui-accent\)/);
+  assert.match(text, /\.global-controls button,\.group-controls button\{[^}]*--global-accent:var\(--rollup-ui-accent\)/);
   assert.doesNotMatch(text, /\.global-(?:open|stop|close)\{--global-accent:/);
 });
 
@@ -49,7 +49,7 @@ test('functional labels and icons use theme-safe UI accents instead of the brigh
   assert.match(text, /--rollup-ui-idle:\$\{tokens\.uiIdle\}/);
   assert.match(text, /--rollup-ui-danger:\$\{tokens\.uiDanger\}/);
   assert.match(text, /\.system\{[^}]*color:var\(--rollup-ui-accent\)/);
-  assert.match(text, /\.global-controls button\{[^}]*--global-accent:var\(--rollup-ui-accent\)/);
+  assert.match(text, /\.global-controls button,\.group-controls button\{[^}]*--global-accent:var\(--rollup-ui-accent\)/);
   assert.match(text, /\.compass\{[^}]*color:var\(--face-ui-color\)/);
   assert.match(text, /\.motion\{[^}]*color:var\(--status-ui-color\)/);
   assert.match(text, /\.foot em\{[^}]*color:var\(--face-ui-color\)/);
@@ -63,7 +63,7 @@ test('functional labels and icons use theme-safe UI accents instead of the brigh
 test('disabled controls remain visibly distinguishable on light themes', async () => {
   const text = await source('src/card.js');
   assert.match(text, /\.controls button:disabled\{[^}]*opacity:\.52/);
-  assert.match(text, /\.global-controls button:disabled\{[^}]*opacity:\.52/);
+  assert.match(text, /\.global-controls button:disabled,\.group-controls button:disabled\{[^}]*opacity:\.52/);
 });
 
 test('single-column mobile layout provides touch-sized cover and global controls', async () => {

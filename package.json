@@ -1,7 +1,7 @@
 {
   "name": "uninus-greenhouse-rollup-card",
-  "version": "1.5.0",
-  "description": "Standalone Home Assistant Lovelace card for greenhouse roll-up covers",
+  "version": "2.0.0",
+  "description": "Home Assistant greenhouse card for arbitrary rollups, skylights, shades, and grouped Cover controls",
   "type": "module",
   "main": "uninus-greenhouse-rollup-card.js",
   "scripts": {
@@ -16,6 +16,9 @@
     "hacs",
     "greenhouse",
     "rollup",
+    "skylight",
+    "shade",
+    "cover",
     "custom-card"
   ],
   "license": "MIT",

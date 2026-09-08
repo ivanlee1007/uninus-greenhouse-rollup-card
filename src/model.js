@@ -6,6 +6,7 @@ const FACE_DEFAULTS = {
   west: { key: 'west', compass: 'W', name: '西側' },
   north: { key: 'north', compass: 'N', name: '北側' },
 };
+const ITEM_KINDS = new Set(['rollup', 'skylight', 'shade']);
 
 const THEMES = new Set(['dark', 'light', 'greenhouse', 'sand', 'uninus']);
 const COLOR_PATTERN = /^(#[0-9a-f]{3,8}|rgba?\([^)]+\)|hsla?\([^)]+\)|[a-z]+)$/i;
@@ -15,14 +16,15 @@ const COVER_FEATURE_STOP = 8;
 
 export const DEFAULT_CONFIG = Object.freeze({
   type: 'custom:uninus-greenhouse-rollup-card',
-  title: '溫室側簾捲揚',
-  subtitle: '四向開啟位置・透光／通風狀態・即時運轉監測',
+  title: '溫室 Cover 控制',
+  subtitle: '捲揚・天窗・遮陰位置與即時運轉監測',
   subtitle_entity: '',
   subtitle_attribute: '',
   theme: 'dark',
   items_per_row: 2,
   animation: true,
   show_global_controls: false,
+  show_group_controls: false,
   unit: '秒',
   status_idle_color: '#8798a2',
   status_moving_color: '#ffd54a',
@@ -37,34 +39,61 @@ export function isValidColor(value) {
   return typeof value === 'string' && COLOR_PATTERN.test(value.trim()) && !/url|javascript|expression/i.test(value);
 }
 
-function normalizeFace(input, key) {
-  const base = FACE_DEFAULTS[key];
+function uniqueItemId(value, used, index) {
+  const requested = String(value ?? '').trim();
+  const base = requested || `item-${index + 1}`;
+  let candidate = base;
+  let suffix = 2;
+  while (used.has(candidate)) candidate = `${base}-${suffix++}`;
+  used.add(candidate);
+  return candidate;
+}
+
+function normalizeItem(input, index, used, legacyKey = '') {
+  const base = FACE_DEFAULTS[legacyKey] ?? { name: `Cover ${index + 1}`, compass: '' };
   const value = input && typeof input === 'object' ? input : {};
+  const id = uniqueItemId(value.id ?? value.key ?? legacyKey, used, index);
   return {
-    ...base,
     cover_entity: '',
     entity: '',
     motion_entity: '',
     max_entity: '',
     ...value,
-    key,
+    id,
+    key: id,
     entity_mode: value.entity_mode === 'cover_entity' || value.entity_mode === 'position_entity'
       ? value.entity_mode
       : value.cover_entity ? 'cover_entity' : 'position_entity',
     name: String(value.name ?? base.name),
+    kind: ITEM_KINDS.has(value.kind) ? value.kind : 'rollup',
+    direction: String(value.direction ?? value.compass ?? base.compass ?? ''),
+    label: String(value.label ?? ''),
+    icon: String(value.icon ?? ''),
+    group: String(value.group ?? ''),
     max_value: Number.isFinite(Number(value.max_value)) && Number(value.max_value) > 0 ? Number(value.max_value) : 120,
     accent_color: isValidColor(value.accent_color) ? value.accent_color : '',
   };
 }
 
+function migrateFaces(faces) {
+  const supplied = Array.isArray(faces) ? faces : [];
+  const keyed = supplied.filter((face) => face?.key);
+  const byKey = new Map(keyed.map((face) => [face.key, face]));
+  const positional = supplied.filter((face) => !face?.key);
+  let positionalIndex = 0;
+  return FACE_KEYS.map((key) => byKey.get(key) ?? positional[positionalIndex++] ?? { key });
+}
+
 export function normalizeConfig(raw = {}) {
   const input = raw && typeof raw === 'object' ? raw : {};
   const { force_1x4: legacyForceOneByFour, ...config } = input;
-  const suppliedFaces = Array.isArray(config.faces) ? config.faces : [];
-  const byKey = new Map(suppliedFaces.map((face) => [face?.key, face]));
+  const hasItems = Object.hasOwn(config, 'items') && Array.isArray(config.items);
+  const suppliedItems = hasItems ? config.items : migrateFaces(config.faces);
+  const usedIds = new Set();
+  const { faces: _legacyFaces, items: _rawItems, ...configValues } = config;
   const normalized = {
     ...DEFAULT_CONFIG,
-    ...config,
+    ...configValues,
     type: DEFAULT_CONFIG.type,
     theme: THEMES.has(config.theme) ? config.theme : DEFAULT_CONFIG.theme,
     items_per_row: config.items_per_row === 'auto'
@@ -74,7 +103,8 @@ export function normalizeConfig(raw = {}) {
         : legacyForceOneByFour === true ? 4 : DEFAULT_CONFIG.items_per_row,
     animation: config.animation !== false,
     show_global_controls: config.show_global_controls === true,
-    faces: FACE_KEYS.map((key, index) => normalizeFace(byKey.get(key) ?? suppliedFaces[index], key)),
+    show_group_controls: config.show_group_controls === true,
+    items: suppliedItems.map((item, index) => normalizeItem(item, index, usedIds, hasItems ? '' : FACE_KEYS[index])),
   };
   for (const key of ['status_idle_color', 'status_moving_color', 'closed_color', 'open_color']) {
     if (!isValidColor(config[key])) normalized[key] = DEFAULT_CONFIG[key];
@@ -218,11 +248,12 @@ export function coverServiceForAction(action) {
   return ({ open: 'open_cover', stop: 'stop_cover', close: 'close_cover' })[action] ?? '';
 }
 
-export function resolveGlobalControlTargets(config, states = {}, action) {
+export function resolveGlobalControlTargets(config, states = {}, action, group = '') {
   if (!coverServiceForAction(action)) return [];
   const targets = new Set();
-  for (const face of normalizeConfig(config).faces) {
-    const state = resolveFaceState(face, states);
+  for (const item of normalizeConfig(config).items) {
+    if (group && item.group !== group) continue;
+    const state = resolveFaceState(item, states);
     if (!state.integration || !state.available || !/^cover\.[a-z0-9_]+$/.test(state.controlEntity ?? '')) continue;
     if (state.supports?.[action] === false) continue;
     if (action !== 'stop' && state.commandState === 'conflict') continue;
@@ -251,32 +282,57 @@ export function selectLayout({ width = 0, itemsPerRow = DEFAULT_CONFIG.items_per
   return `columns-${requested}`;
 }
 
-export function updateFaceConfig(config, faceKey, property, value) {
+export function updateItemConfig(config, itemId, property, value) {
   return {
     ...config,
-    faces: config.faces.map((face) => face.key === faceKey ? { ...face, [property]: value } : face),
+    items: config.items.map((item) => item.id === itemId ? { ...item, [property]: value } : item),
   };
 }
 
-export function applyEditorChange(config, { faceKey, property, value, valueType } = {}) {
+export const updateFaceConfig = updateItemConfig;
+
+export function addItem(config) {
+  const normalized = normalizeConfig(config);
+  const used = new Set(normalized.items.map(({ id }) => id));
+  const id = uniqueItemId('', used, normalized.items.length);
+  return { ...normalized, items: [...normalized.items, normalizeItem({ id, name: `Cover ${normalized.items.length + 1}`, entity_mode: 'cover_entity' }, normalized.items.length, new Set(normalized.items.map(({ id: value }) => value)))] };
+}
+
+export function deleteItem(config, itemId) {
+  return { ...config, items: config.items.filter(({ id }) => id !== itemId) };
+}
+
+export function moveItem(config, itemId, offset) {
+  const items = [...config.items];
+  const index = items.findIndex(({ id }) => id === itemId);
+  const target = Math.max(0, Math.min(items.length - 1, index + Math.sign(Number(offset) || 0)));
+  if (index < 0 || target === index) return config;
+  const [item] = items.splice(index, 1);
+  items.splice(target, 0, item);
+  return { ...config, items };
+}
+
+export function applyEditorChange(config, { itemId, faceKey, property, value, valueType } = {}) {
   const nextValue = valueType === 'boolean' ? value === true : value;
-  if (faceKey) return updateFaceConfig(config, faceKey, property, nextValue);
+  const id = itemId ?? faceKey;
+  if (id) return updateItemConfig(config, id, property, nextValue);
   return { ...config, [property]: nextValue };
 }
 
 export function configForSave(config) {
   const result = {
     ...config,
-    faces: config.faces.map((face) => {
-      if (face.entity_mode === 'cover_entity') {
-        const { entity: _entity, motion_entity: _motion, max_entity: _maxEntity, max_value: _maxValue, ...coverFace } = face;
-        return coverFace;
+    items: config.items.map((item) => {
+      if (item.entity_mode === 'cover_entity') {
+        const { entity: _entity, motion_entity: _motion, max_entity: _maxEntity, max_value: _maxValue, compass: _compass, key: _key, ...coverItem } = item;
+        return coverItem;
       }
-      const { cover_entity: _cover, ...legacyFace } = face;
-      return legacyFace;
+      const { cover_entity: _cover, compass: _compass, key: _key, ...legacyItem } = item;
+      return legacyItem;
     }),
   };
-  if (!result.faces.some((face) => face.entity_mode === 'position_entity')) delete result.unit;
+  delete result.faces;
+  if (!result.items.some((item) => item.entity_mode === 'position_entity')) delete result.unit;
   return result;
 }
 

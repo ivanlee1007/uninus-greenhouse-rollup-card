@@ -20,16 +20,25 @@ test('HACS metadata, package and built card agree', async () => {
   assert.match(readme, /自動加入.*資源/);
 });
 
-test('README documents the visual editor and exact items per row', async () => {
+test('README documents the visual editor and arbitrary items in one to four columns', async () => {
   const readme = await readFile(new URL('README.md', root), 'utf8');
   assert.match(readme, /視覺化設定/);
-  assert.match(readme, /每列捲揚數量/);
-  assert.match(readme, /最多 4/);
+  assert.match(readme, /每列項目數量/);
+  assert.match(readme, /項目總數不限/);
+  assert.match(readme, /1～4 欄/);
   assert.match(readme, /items_per_row/);
   assert.match(readme, /固定產生 1～4 欄/);
   assert.match(readme, /原生 MQTT Cover/);
   assert.match(readme, /舊版雙 Switch/);
   assert.doesNotMatch(readme, /force_1x4/);
+});
+
+test('README documents items, legacy face migration, and optional group controls', async () => {
+  const readme = await readFile(new URL('README.md', root), 'utf8');
+  assert.match(readme, /items:/);
+  assert.match(readme, /kind.*rollup.*skylight.*shade/s);
+  assert.match(readme, /舊版 `faces:`.*遷移/s);
+  assert.match(readme, /show_group_controls/);
 });
 
 test('README documents optional global controls and their card-only scope', async () => {
