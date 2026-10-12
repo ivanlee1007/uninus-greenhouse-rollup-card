@@ -684,6 +684,44 @@ test('editor persists generic kind group direction name and cover entity fields'
   editor.remove();
 });
 
+test('mixed scroll modes keep geometry percentages unknown states and control semantics', async () => {
+  const {card,calls}=createCard({state:'opening',attributes:{current_position:50,supported_features:11}});
+  card.setConfig({items:[{id:'wall',cover_entity:'cover.east'}, {id:'roof',scroll_mode:'horizontal',cover_entity:'cover.east'}]});
+  assert.ok(card.shadowRoot.querySelector('.scroll-vertical'));
+  const horizontal=card.shadowRoot.querySelector('.scroll-horizontal');
+  assert.ok(horizontal);
+  assert.match(horizontal.getAttribute('style'), /--open:50%/);
+  assert.match(horizontal.querySelector('[data-action="open"]').textContent, /▶/);
+  assert.match(horizontal.querySelector('[data-action="close"]').textContent, /◀/);
+  horizontal.querySelector('[data-action="stop"]').click();
+  await new Promise(resolve => setTimeout(resolve,0));
+  assert.deepEqual(calls,[['cover','stop_cover',{entity_id:'cover.east'}]]);
+  card.hass={...card.hass,states:{'cover.east':{state:'opening',attributes:{}}}};
+  assert.ok(card.shadowRoot.querySelector('.scroll-horizontal.unknown'));
+  assert.equal(card.shadowRoot.querySelector('.scroll-horizontal .percent').textContent,'—');
+  card.setConfig({...card._config,animation:false});
+  assert.equal(card.shadowRoot.querySelector('.scroll-horizontal.animated'),null);
+  card.remove();
+});
+
+test('editor selects saves and reopens each item scroll mode without changing direction', () => {
+  const editor = window.document.createElement('uninus-greenhouse-rollup-test-editor');
+  editor.setConfig({items:[{id:'wall', direction:'E'}, {id:'roof', scroll_mode:'horizontal'}]});
+  let saved;
+  editor.addEventListener('config-changed', event => { saved=event.detail.config; });
+  const select=editor.shadowRoot.querySelector('[data-item="wall"][data-property="scroll_mode"]');
+  assert.ok(select);
+  assert.equal(select.value, 'vertical');
+  assert.equal(editor.shadowRoot.querySelector('[data-item="roof"][data-property="scroll_mode"]').value, 'horizontal');
+  select.querySelector('[value="vertical"]').removeAttribute('selected');
+  select.querySelector('[value="horizontal"]').setAttribute('selected','');
+  select.dispatchEvent(new window.Event('change',{bubbles:true}));
+  assert.equal(saved.items[0].scroll_mode, 'horizontal');
+  assert.equal(saved.items[0].direction,'E');
+  editor.setConfig(saved);
+  assert.equal(editor.shadowRoot.querySelector('[data-item="wall"][data-property="scroll_mode"]').value,'horizontal');
+});
+
 test('editor exposes and persists optional grouped controls', () => {
   const editor = window.document.createElement('uninus-greenhouse-rollup-test-editor');
   window.document.body.append(editor);

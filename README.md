@@ -63,6 +63,28 @@ items:
 
 舊版 `faces:` 設定仍可直接載入，卡片會依東、南、西、北順序遷移；視覺化編輯器下一次儲存時只會輸出新版 `items:`。
 
+### 設施捲動模式
+
+在視覺化設定的每個 Cover 項目中，使用「捲動模式」選擇「上下」或「左右」。同一卡片可混用兩種模式，與 `kind`、方位 `direction` 及控制服務無關。
+
+```yaml
+items:
+  - id: wall
+    name: 側簾
+    cover_entity: cover.wall
+    scroll_mode: vertical
+  - id: shade
+    name: 遮陽
+    cover_entity: cover.shade
+    scroll_mode: horizontal
+```
+
+- `vertical`（上下，預設）：開啟向上收起，關閉向下展開。
+- `horizontal`（左右）：開啟向右收起，關閉向左展開；使用直立捲軸，刻度由左側 0 到右側 100，單體控制圖示同步改成左右箭頭。
+- 未設定或設定無效值時使用上下模式，舊版 `faces` 設定也保持相容。
+- 百分比仍由 Entity 回報；位置未知時顯示「位置未知」與 `—`，不將示意圖當成真實位置。
+- 兩種模式皆沿用全域 `animation` 設定與系統「減少動態效果」偏好。
+
 ### 每列項目數量
 
 視覺化設定可選固定 `1～4` 欄，或選擇「自適應（依卡片寬度）」。YAML 使用：
