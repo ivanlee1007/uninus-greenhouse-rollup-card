@@ -127,7 +127,7 @@ Card 主標題會在 `18～24px` 間調整；副標題、狀態、估算位置�
 
 右上角原本的 `GREENHOUSE VENTILATION` 會替換為可點擊的彙總標籤，區分全啟用、全停用、部分啟用與狀態不完整。點擊只展開本卡片內的「全部啟用／全部停用」，不重複列出個別設施。未啟用全域控制按鈕也能使用此設定入口。
 
-- 需要 Integration 提供 `uninus_greenhouse_rollup.set_auto_stop_at_travel_end`；若尚未更新 Integration，開關會停用並提示服務不可用。
+- 需要 Integration **v3.1.0 或更新版本**提供 `uninus_greenhouse_rollup.set_auto_stop_at_travel_end`；若尚未更新 Integration，開關會停用並提示服務不可用。
 - 寫入 Integration 的持久化設定，不是卡片 YAML；介面等待 Cover 屬性讀回才結束 pending，不假裝已成功。
 - 運轉中、底層 Switch 仍通電、控制命令未完成或狀態不完整時，不允許修改。估算到 0／100% 不代表繼電器已斷電。
 - 停用會先要求確認。修改成功後從下一次 Cover 全開／全關命令生效；卡片不計時、不直接操作底層 Switch。
