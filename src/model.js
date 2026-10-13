@@ -67,6 +67,7 @@ function normalizeItem(input, index, used, legacyKey = '') {
     name: String(value.name ?? base.name),
     kind: ITEM_KINDS.has(value.kind) ? value.kind : 'rollup',
     scroll_mode: value.scroll_mode === 'horizontal' ? 'horizontal' : 'vertical',
+    percentage_mode: value.percentage_mode === 'reversed' ? 'reversed' : 'normal',
     direction: String(value.direction ?? value.compass ?? base.compass ?? ''),
     label: String(value.label ?? ''),
     icon: String(value.icon ?? ''),

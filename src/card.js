@@ -214,6 +214,12 @@ export class UninusGreenhouseRollupCard extends HTMLElement {
 
   _renderFace(face){
     const state=resolveFaceState(face,this.hass.states);const displayName=String(face.name??'').trim();const meta=KIND_META[face.kind]??KIND_META.rollup;const visualPercent=state.positionKnown?state.percent:50;const accent=face.accent_color||this._config.open_color;const status=state.commandState==='conflict'?'#ff6b6b':state.moving?this._config.status_moving_color:this._config.status_idle_color;const light=18+visualPercent*.48;const open=face.accent_color||`hsl(43 96% ${light}%)`;const cls=`face cover-item kind-${face.kind} scroll-${face.scroll_mode} motion-${state.motion} ${state.moving?'moving':'idle'} ${state.positionKnown?'':'unknown'} ${state.commandState==='conflict'?'conflict':''} ${this._config.animation?'animated':''}`;
+    // Display mode never changes HA positions, animation geometry, or cover commands.
+    const reversed=face.percentage_mode==='reversed';
+    const percentageAvailable=state.available&&state.positionKnown;
+    const displayPercent=percentageAvailable?(reversed?100-state.percent:state.percent):null;
+    const positionLabel=reversed&&percentageAvailable&&state.percent>0&&state.percent<100
+      ?state.positionLabel.replace(`開啟 ${state.percent}%`,`關閉 ${displayPercent}%`):state.positionLabel;
     const detail=state.integration?[state.commandLabel,state.confidenceLabel].filter(Boolean).join(' · '):state.available?`${Math.round(state.value)} ${this._config.unit} / ${state.maximum} ${this._config.unit}`:face.entity||'尚未設定實體';
     const pending=this._pendingActions.get(state.controlEntity)??new Set();const directionDisabled=!state.available||state.commandState==='conflict'||pending.size>0||this._autoStopPending.has(state.controlEntity);const stopDisabled=!state.available||pending.has('stop');
     const controlCount=['open','stop','close'].filter((action)=>state.supports?.[action]!==false).length;
@@ -223,15 +229,15 @@ export class UninusGreenhouseRollupCard extends HTMLElement {
       ${state.supports?.close!==false?`<button type="button" data-action="close" data-entity="${escapeHtml(state.controlEntity)}" ${directionDisabled?'disabled':''} aria-label="關閉${escapeHtml(displayName)}">${face.scroll_mode==='horizontal'?'◀':'▼'} 關閉</button>`:''}
     </div>`:'';
     const autoStop=resolveAutoStopState(face,this.hass.states);
-    const autoStopFooter=autoStop.supported?`<span class="auto-stop-setting"><span class="auto-stop-label">自動停機 <button type="button" class="auto-stop-switch" role="switch" data-entity="${escapeHtml(autoStop.entityId)}" aria-label="${escapeHtml(displayName)}自動停機${autoStop.known?'':'，狀態不完整'}" data-unknown="${!autoStop.known}" title="${escapeHtml(this._autoStopReason([autoStop])||'行程結束後關閉兩個方向 Switch')}" aria-checked="${autoStop.enabled===true}" aria-busy="${this._autoStopPending.has(autoStop.entityId)}" ${!this._autoStopWritable([autoStop])?'disabled':''}></button></span><em>${state.positionKnown?`${state.percent}%`:'N/A'}</em></span>`:'';
+    const autoStopFooter=autoStop.supported?`<span class="auto-stop-setting"><span class="auto-stop-label">自動停機 <button type="button" class="auto-stop-switch" role="switch" data-entity="${escapeHtml(autoStop.entityId)}" aria-label="${escapeHtml(displayName)}自動停機${autoStop.known?'':'，狀態不完整'}" data-unknown="${!autoStop.known}" title="${escapeHtml(this._autoStopReason([autoStop])||'行程結束後關閉兩個方向 Switch')}" aria-checked="${autoStop.enabled===true}" aria-busy="${this._autoStopPending.has(autoStop.entityId)}" ${!this._autoStopWritable([autoStop])?'disabled':''}></button></span><em>${percentageAvailable?`${displayPercent}%`:'N/A'}</em></span>`:'';
     return `<article class="${escapeHtml(cls)}" data-entity="${escapeHtml(state.controlEntity)}" style="--open:${visualPercent}%;--face-accent:${escapeHtml(accent)};--face-ui-color:${face.accent_color?escapeHtml(accent):'var(--rollup-ui-accent)'};--status-color:${escapeHtml(status)};--status-ui-color:${state.commandState==='conflict'?'var(--rollup-ui-danger)':state.moving?'var(--rollup-ui-accent)':'var(--rollup-ui-idle)'};--open-color:${escapeHtml(open)}">
       <div class="face-head"><span class="compass"><ha-icon icon="${escapeHtml(face.icon||meta.icon)}"></ha-icon>${face.direction?`<span>${escapeHtml(face.direction)}</span>`:''}</span><span class="name">${escapeHtml(displayName)}${face.label?`<small>${escapeHtml(face.label)}</small>`:''}</span><span class="motion"><i></i>${escapeHtml(state.motionLabel)}</span></div>
-      <div class="scene" role="img" aria-label="${escapeHtml(`${meta.label}${displayName}，${state.positionLabel}，${state.motionLabel}`)}">
+      <div class="scene" role="img" aria-label="${escapeHtml(`${meta.label}${displayName}，${positionLabel}，${state.motionLabel}`)}">
         <div class="opening"><b class="ray one"></b><b class="ray two"></b><i class="rollup-air"></i><i class="rollup-air"></i><i class="rollup-air"></i></div>
         <div class="curtain"><i class="shine"></i><b></b><b></b></div><div class="roller"><i></i><span></span><i></i></div>
-        <span class="scale top">100</span><span class="scale mid">50</span><span class="scale bottom">0</span><strong class="percent">${state.positionKnown?`${state.percent}%`:'—'}</strong>
+        <span class="scale top">${reversed?0:100}</span><span class="scale mid">50</span><span class="scale bottom">${reversed?100:0}</span><strong class="percent">${percentageAvailable?`${displayPercent}%`:'—'}</strong>
       </div>
-      <footer class="foot ${autoStop.supported?'auto-stop-foot':''}"><button type="button" class="more-info" data-entity="${escapeHtml(state.controlEntity)}" aria-label="開啟${escapeHtml(displayName)}詳細資料" title="${escapeHtml(`${state.positionLabel} · ${detail}`)}"><span class="copy"><strong>${escapeHtml(state.positionLabel)}</strong><small>${escapeHtml(detail)}</small></span>${autoStop.supported?'':`<em>${state.positionKnown?`${state.percent}%`:'N/A'}</em>`}</button>${autoStopFooter}</footer>
+      <footer class="foot ${autoStop.supported?'auto-stop-foot':''}"><button type="button" class="more-info" data-entity="${escapeHtml(state.controlEntity)}" aria-label="開啟${escapeHtml(displayName)}詳細資料" title="${escapeHtml(`${positionLabel} · ${detail}`)}"><span class="copy"><strong>${escapeHtml(positionLabel)}</strong><small>${escapeHtml(detail)}</small></span>${autoStop.supported?'':`<em>${percentageAvailable?`${displayPercent}%`:'N/A'}</em>`}</button>${autoStopFooter}</footer>
       ${controls}
     </article>`;
   }
