@@ -1,4 +1,4 @@
-import { coverServiceForAction, GRID_OPTIONS, normalizeConfig, resolveFaceState, resolveGlobalControlTargets, resolveSubtitle, resolveThemeTokens, selectLayout } from './model.js';
+import { coverServiceForAction, GRID_OPTIONS, normalizeConfig, resolveAutoStopState, resolveFaceState, resolveGlobalControlTargets, resolveSubtitle, resolveThemeTokens, selectLayout } from './model.js';
 
 const escapeHtml=(value)=>String(value??'').replace(/[&<>"']/g,(char)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const KIND_META={rollup:{label:'捲簾',icon:'mdi:window-shutter'},skylight:{label:'天窗',icon:'mdi:window-open-variant'},shade:{label:'遮陽',icon:'mdi:roller-shade'}};
@@ -30,15 +30,19 @@ export class UninusGreenhouseRollupCard extends HTMLElement {
     .scroll-horizontal.moving.animated .roller span{animation-name:roll-horizontal}.motion-closing.moving.animated .roller span{animation-direction:reverse}
     .scroll-horizontal .scale{top:auto;bottom:5px}.scroll-horizontal .scale.top{right:5px;left:auto}.scroll-horizontal .scale.mid{left:calc(50% - 6px);right:auto}.scroll-horizontal .scale.bottom{left:5px;right:auto}.scroll-horizontal .percent{top:6px;bottom:auto}
     @keyframes roll-horizontal{to{background-position:0 30px}}
+    .foot.auto-stop-foot{display:flex;align-items:stretch}.auto-stop-foot .more-info{width:auto;flex:1;min-width:0}.auto-stop-setting{display:grid;gap:2px;flex:none;text-align:right;align-content:end}.auto-stop-label{display:flex;align-items:center;justify-content:end;gap:4px;white-space:nowrap;font-size:var(--ui-detail-size)}.auto-stop-switch{all:unset;box-sizing:border-box;display:inline-block;width:1.8em;height:.95em;border:1px solid var(--rollup-muted);border-radius:1em;background:var(--rollup-frame);cursor:pointer;position:relative}.auto-stop-switch::before{content:'';position:absolute;right:0;top:50%;transform:translateY(-50%);width:44px;height:24px}.auto-stop-switch::after{content:'';position:absolute;top:1px;left:1px;height:calc(.95em - 4px);width:calc(.95em - 4px);border-radius:50%;background:var(--rollup-muted)}.auto-stop-switch[aria-checked=true]{background:var(--rollup-ui-accent);border-color:var(--rollup-ui-accent)}.auto-stop-switch[aria-checked=true]::after{left:auto;right:1px;background:var(--rollup-bg)}.auto-stop-switch:disabled{opacity:.52;cursor:not-allowed}.auto-stop-switch:focus-visible{outline:2px solid var(--rollup-ui-accent);outline-offset:2px}.auto-stop-setting em,.columns-3 .auto-stop-setting em,.columns-4 .auto-stop-setting em{display:block;font-size:var(--ui-meta-size)}
+    button.system{background:transparent;cursor:pointer;font-family:inherit;line-height:normal}button.system:focus-visible{outline:2px solid var(--rollup-ui-accent);outline-offset:2px}.auto-stop-panel{margin:0 2px 14px;padding:8px;border:1px solid var(--rollup-muted);border-radius:10px;font-size:11px}.auto-stop-panel p{margin:0 0 6px;color:var(--rollup-muted)}.auto-stop-panel>div{display:flex;gap:6px}.auto-stop-panel button{font:inherit;border:1px solid var(--rollup-ui-accent);border-radius:6px;padding:6px 9px;background:var(--rollup-surface);color:var(--rollup-text);cursor:pointer}.auto-stop-panel button:disabled{opacity:.52;cursor:not-allowed}
+    .auto-stop-overlay{position:absolute;inset:0;z-index:20;display:grid;place-items:center;background:rgba(0,0,0,.65);padding:12px}.auto-stop-dialog{max-width:420px;padding:14px;border-radius:12px;background:var(--rollup-frame);color:var(--rollup-text);font-size:12px}.auto-stop-dialog h3{margin:0 0 8px}.auto-stop-dialog button{font:inherit;padding:8px;margin-right:8px;background:var(--rollup-surface);color:var(--rollup-text);border:1px solid var(--rollup-ui-accent);border-radius:6px}.auto-stop-dialog button:disabled{opacity:.52}.auto-stop-error{color:var(--rollup-ui-danger);font-size:12px;overflow-wrap:anywhere}.auto-stop-switch[aria-checked=true]::after{background:#fff}.auto-stop-switch[data-unknown=true]{border-style:dashed}
     @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
   `;
 
-  constructor(){super();this.attachShadow({mode:'open'});this._config=normalizeConfig({});this._layout='columns-2';this._observer=null;this._lastRect={width:0,height:0};this._hass=null;this._pendingActions=new Map();this._globalActions=new Set()}
-  set hass(value){this._hass=value;this._render()}
+  constructor(){super();this.attachShadow({mode:'open'});this._config=normalizeConfig({});this._layout='columns-2';this._observer=null;this._lastRect={width:0,height:0};this._hass=null;this._pendingActions=new Map();this._globalActions=new Set();this._autoStopPending=new Map();this._autoStopError='';this.shadowRoot.addEventListener('keydown',(event)=>{if(!this._autoStopConfirmation)return;if(event.key==='Escape'){event.preventDefault();this._closeAutoStopConfirmation()}else if(event.key==='Tab'){const buttons=[...this.shadowRoot.querySelectorAll('.auto-stop-dialog button:not(:disabled)')];const index=buttons.indexOf(this.shadowRoot.activeElement);event.preventDefault();buttons[(index+(event.shiftKey?-1:1)+buttons.length)%buttons.length]?.focus()}})}
+  set hass(value){this._hass=value;this._reconcileAutoStop();this._render()}
   get hass(){return this._hass}
-  setConfig(config){this._config=normalizeConfig(config);this._measure();this._render()}
+  setConfig(config){this._cancelAutoStop();this._config=normalizeConfig(config);this._measure();this._render()}
   connectedCallback(){this._observe();this._measure();this._render()}
-  disconnectedCallback(){this._observer?.disconnect()}
+  disconnectedCallback(){this._observer?.disconnect();this._cancelAutoStop()}
+  _cancelAutoStop(){for(const operation of new Set(this._autoStopPending.values())){clearTimeout(operation.timer);operation.timer=null}this._autoStopPending.clear();this._autoStopConfirmation=null;this._autoStopError=''}
   _observe(){if(!globalThis.ResizeObserver)return;if(!this._observer)this._observer=new ResizeObserver((entries)=>{const r=entries[0]?.contentRect;if(r)this._setLayout(r.width,r.height)});this._observer.disconnect();this._observer.observe(this)}
   _measure(){const r=this.getBoundingClientRect?.();if(r)this._setLayout(r.width,r.height)}
   _setLayout(width,height){this._lastRect={width,height};const next=selectLayout({width,itemsPerRow:this._config.items_per_row});if(next!==this._layout){this._layout=next;this._render()}}
@@ -48,7 +52,7 @@ export class UninusGreenhouseRollupCard extends HTMLElement {
     const button=event.currentTarget;const entityId=button?.dataset?.entity;const action=button?.dataset?.action;const service=coverServiceForAction(action);
     if(!entityId||!service||!this.hass?.callService)return;
     const pending=this._pendingActions.get(entityId)??new Set();
-    if((action==='stop'&&pending.has('stop'))||(action!=='stop'&&pending.size))return;
+    if((action==='stop'&&pending.has('stop'))||(action!=='stop'&&(pending.size||this._autoStopPending.has(entityId))))return;
     pending.add(action);this._pendingActions.set(entityId,pending);this._render();
     try{await this.hass.callService('cover',service,{entity_id:entityId})}
     catch(error){this.dispatchEvent(new CustomEvent('hass-notification',{detail:{message:`${this._config.title}控制失敗：${error?.message??error}`},bubbles:true,composed:true}))}
@@ -60,7 +64,7 @@ export class UninusGreenhouseRollupCard extends HTMLElement {
   async _globalControl(event){
     event.stopPropagation();
     const action=event.currentTarget?.dataset?.action;const group=event.currentTarget?.dataset?.group??'';const service=coverServiceForAction(action);const targets=this._globalControlTargets(action,group);
-    const directionBlocked=action!=='stop'&&(this._globalActions.size||this._pendingActions.size);
+    const directionBlocked=action!=='stop'&&(this._globalActions.size||this._pendingActions.size||this._autoStopPending.size);
     if(!service||!targets.length||this._globalActions.has(action)||directionBlocked||!this.hass?.callService)return;
     this._globalActions.add(action);
     for(const entityId of targets){const pending=this._pendingActions.get(entityId)??new Set();pending.add(action);this._pendingActions.set(entityId,pending)}
@@ -72,7 +76,7 @@ export class UninusGreenhouseRollupCard extends HTMLElement {
 
   _renderGlobalControls(){
     if(!this._config.show_global_controls)return '';
-    const directionBusy=Boolean(this._globalActions.size||this._pendingActions.size);
+    const directionBusy=Boolean(this._globalActions.size||this._pendingActions.size||this._autoStopPending.size);
     return `<nav class="global-controls" aria-label="卡片內所有 Cover 全域控制">
       ${[['open','global-open','全開'],['stop','global-stop','全停'],['close','global-close','全關']].map(([action,className,label])=>{const busy=action==='stop'?this._globalActions.has('stop'):directionBusy;const disabled=busy||!this._globalControlTargets(action).length;return `<button type="button" class="${className}" data-action="${action}" ${disabled?'disabled':''} aria-label="${label}卡片內所有可控制 Cover">${label}</button>`}).join('')}
     </nav>`;
@@ -81,37 +85,145 @@ export class UninusGreenhouseRollupCard extends HTMLElement {
   _renderGroupControls(){
     if(!this._config.show_group_controls)return '';
     const groups=[...new Set(this._config.items.map((item)=>item.group).filter(Boolean))];
-    const directionBusy=Boolean(this._globalActions.size||this._pendingActions.size);
+    const directionBusy=Boolean(this._globalActions.size||this._pendingActions.size||this._autoStopPending.size);
     return groups.map((group)=>`<nav class="group-controls" data-group="${escapeHtml(group)}" aria-label="${escapeHtml(`${group}群組控制`)}"><strong class="control-heading">${escapeHtml(group)}</strong>${[['open','global-open','全開'],['stop','global-stop','全停'],['close','global-close','全關']].map(([action,className,label])=>{const busy=action==='stop'?this._globalActions.has('stop'):directionBusy;const disabled=busy||!this._globalControlTargets(action,group).length;return `<button type="button" class="${className}" data-action="${action}" data-group="${escapeHtml(group)}" ${disabled?'disabled':''} aria-label="${escapeHtml(`${group}${label}`)}">${label}</button>`}).join('')}</nav>`).join('');
+  }
+
+  _autoStopStates(){return [...new Map(this._config.items.map((item)=>resolveAutoStopState(item,this.hass?.states)).filter((state)=>state.supported).map((state)=>[state.entityId,state])).values()]}
+
+  _autoStopReason(states){
+    if(!this.hass?.callService||!this.hass?.services?.uninus_greenhouse_rollup?.set_auto_stop_at_travel_end)return 'Home Assistant 自動停機設定服務不可用';
+    if(!states.length||states.some((state)=>!state.available))return 'Cover 狀態不可用';
+    if(states.some((state)=>!state.known))return '自動停機或繼電器狀態不完整';
+    if(states.some((state)=>state.busy))return '運轉中或繼電器仍通電，請先停止';
+    if(states.some((state)=>this._pendingActions.has(state.entityId)))return '控制命令尚未完成';
+    if(states.some((state)=>this._autoStopPending.has(state.entityId)))return '自動停機設定等待狀態確認';
+    return '';
+  }
+
+  _autoStopWritable(states){return !this._autoStopReason(states)}
+
+  _finishAutoStop(operation,error=''){
+    if(!operation.ids.some((id)=>this._autoStopPending.get(id)===operation))return;
+    clearTimeout(operation.timer);operation.timer=null;
+    for(const id of operation.ids)if(this._autoStopPending.get(id)===operation)this._autoStopPending.delete(id);
+    this._autoStopError=error;
+    this._render();
+  }
+
+  _reconcileAutoStop(){
+    const states=new Map(this._autoStopStates().map((state)=>[state.entityId,state]));
+    for(const operation of new Set(this._autoStopPending.values())){
+      if(operation.settled&&operation.ids.every((id)=>states.get(id)?.enabled===operation.enabled))this._finishAutoStop(operation);
+    }
+  }
+
+  async _writeAutoStop(ids,enabled){
+    const scope=this._autoStopStates().filter((state)=>ids.includes(state.entityId));
+    if(scope.length!==ids.length||!this._autoStopWritable(scope))return;
+    const operation={ids,enabled,settled:false,timer:null};
+    for(const id of ids)this._autoStopPending.set(id,operation);
+    this._autoStopError='';
+    operation.timer=setTimeout(()=>{
+      if(!ids.some((id)=>this._autoStopPending.get(id)===operation))return;
+      operation.timer=null;operation.timedOut=true;
+      const error='自動停機設定未收到狀態確認，請重新確認 Home Assistant 狀態。';
+      if(operation.settled)this._finishAutoStop(operation,error);
+      else{this._autoStopError=error;this._render()}
+    },10000);
+    this._render();
+    try{
+      await this.hass.callService('uninus_greenhouse_rollup','set_auto_stop_at_travel_end',{entity_id:ids,enabled});
+      if(!ids.some((id)=>this._autoStopPending.get(id)===operation))return;
+      operation.settled=true;this._reconcileAutoStop();
+      if(operation.timedOut)this._finishAutoStop(operation,'自動停機設定未收到狀態確認，請重新確認 Home Assistant 狀態。');
+    }catch(error){
+      if(ids.some((id)=>this._autoStopPending.get(id)===operation))this._finishAutoStop(operation,`自動停機設定失敗：${error?.message??error}`);
+    }
+  }
+
+  _closeAutoStopConfirmation(){
+    const invoker=this._autoStopConfirmation?.invoker;
+    this._autoStopConfirmation=null;this._render();
+    const buttons=[...this.shadowRoot.querySelectorAll('button')].filter((button)=>!button.disabled&&!button.closest('[inert]'));
+    const next=buttons.find((button)=>invoker&&(invoker.batch?button.dataset.autoStopBatch==='false':button.classList.contains('auto-stop-switch')&&button.dataset.entity===invoker.entity))
+      ??buttons.find((button)=>button.classList.contains('system'))??buttons[0];
+    if(next)next.focus();else{this.tabIndex=-1;this.focus()}
+  }
+
+  _requestAutoStop(ids,enabled,batch=false){
+    const scope=this._autoStopStates().filter((state)=>ids.includes(state.entityId));
+    if(scope.length!==ids.length||!this._autoStopWritable(scope))return;
+    if(enabled){this._writeAutoStop(ids,true);return}
+    const item=this._config.items.find((item)=>item.cover_entity===ids[0]);
+    this._autoStopConfirmation={ids,batch,invoker:{batch,entity:ids[0]},label:batch?`此卡片內 ${ids.length} 個支援的 Cover`:item?.name||ids[0]};
+    this._render();
+    this.shadowRoot.querySelector('[data-auto-stop-cancel]')?.focus();
+  }
+
+  _confirmationWritable(){
+    const confirmation=this._autoStopConfirmation;if(!confirmation)return false;
+    const scope=this._autoStopStates().filter((state)=>confirmation.ids.includes(state.entityId));
+    return scope.length===confirmation.ids.length&&this._autoStopWritable(scope)
+      &&(!confirmation.batch||this._autoStopStates().map((state)=>state.entityId).join('|')===confirmation.ids.join('|'));
+  }
+
+  _renderAutoStopConfirmation(){
+    if(!this._autoStopConfirmation)return '';
+    return `<div class="auto-stop-overlay"><section class="auto-stop-dialog" role="alertdialog" aria-modal="true" aria-labelledby="auto-stop-confirm-title" aria-describedby="auto-stop-confirm-description"><h3 id="auto-stop-confirm-title">停用自動停機？</h3><p id="auto-stop-confirm-description">${escapeHtml(this._autoStopConfirmation.label)}：停用後，設定行程時間到達不會自動切斷繼電器，必須自行停止。請確認設備有可靠的限位保護。</p><button type="button" data-auto-stop-cancel>取消</button><button type="button" data-auto-stop-confirm ${this._confirmationWritable()?'':'disabled'}>確認停用</button></section></div>`;
+  }
+
+  _renderAutoStopHeader(){
+    const states=this._autoStopStates();
+    if(!states.length)return '<span class="system"><i></i>GREENHOUSE VENTILATION</span>';
+    const label=states.some((state)=>!state.known||!state.available)?'狀態不完整':states.every((state)=>state.enabled)?'全啟用':states.every((state)=>!state.enabled)?'全停用':'部分啟用';
+    return `<button type="button" class="system" aria-expanded="${this._autoStopExpanded===true}" aria-controls="auto-stop-panel" aria-label="自動停機：${label}"><i></i>自動停機 · ${label}<span aria-hidden="true">${this._autoStopExpanded?'▴':'▾'}</span></button>`;
+  }
+
+  _renderAutoStopPanel(){
+    if(!this._autoStopExpanded||!this._autoStopStates().length)return '';
+    const disabled=!this._autoStopWritable(this._autoStopStates());
+    return `<section id="auto-stop-panel" class="auto-stop-panel" aria-label="卡片內自動停機設定"><p>啟用後，由 Cover 啟動全開／全關並經過設定行程時間後，關閉兩個方向 Switch。僅套用此卡片內支援的雙開關 Cover。</p><div><button type="button" data-auto-stop-batch="true" ${disabled?'disabled':''}>全部啟用</button><button type="button" data-auto-stop-batch="false" ${disabled?'disabled':''}>全部停用</button></div></section>`;
   }
 
   _render(){
     if(!this.shadowRoot)return;
     if(!this.hass){this.shadowRoot.innerHTML=`<style>${this.constructor.styles}</style><div class="rollup-card"><div>等待 Home Assistant 狀態資料…</div></div>`;return}
+    const active=this.shadowRoot.activeElement;const focus=active?{entity:active.dataset?.entity,action:active.dataset?.action,auto:active.classList.contains('auto-stop-switch'),system:active.classList.contains('system'),confirm:active.hasAttribute('data-auto-stop-confirm'),cancel:active.hasAttribute('data-auto-stop-cancel'),batch:active.dataset?.autoStopBatch,more:active.classList.contains('more-info')}:null;
     const tokens=resolveThemeTokens(this._config);const subtitle=resolveSubtitle(this._config,this.hass.states);
     const style=`--rollup-bg:${tokens.background};--rollup-surface:${tokens.surface};--rollup-text:${tokens.text};--rollup-muted:${tokens.muted};--rollup-frame:${tokens.frame};--rollup-shadow:${tokens.shadow};--rollup-ui-accent:${tokens.uiAccent};--rollup-ui-idle:${tokens.uiIdle};--rollup-ui-danger:${tokens.uiDanger};--rollup-moving:${this._config.status_moving_color};--rollup-idle:${this._config.status_idle_color};--closed-color:${this._config.closed_color};--open-color:${this._config.open_color}`;
     this.shadowRoot.innerHTML=`<style>${this.constructor.styles}</style><div class="rollup-card ${escapeHtml(this._layout)}" style="${escapeHtml(style)}" aria-label="${escapeHtml(`${this._config.title}，${subtitle}`)}">
-      <header class="header"><div><h2>${escapeHtml(this._config.title)}</h2>${subtitle?`<p>${escapeHtml(subtitle)}</p>`:''}</div><span class="system"><i></i>GREENHOUSE VENTILATION</span></header>
+      <header class="header"><div><h2>${escapeHtml(this._config.title)}</h2>${subtitle?`<p>${escapeHtml(subtitle)}</p>`:''}</div>${this._renderAutoStopHeader()}</header>${this._renderAutoStopPanel()}${this._autoStopError?`<p class="auto-stop-error" role="alert">${escapeHtml(this._autoStopError)}</p>`:''}
       ${this._renderGlobalControls()}
       ${this._renderGroupControls()}
-      <section class="faces">${this._config.items.map((item)=>this._renderFace(item)).join('')}</section>
+      <section class="faces">${this._config.items.map((item)=>this._renderFace(item)).join('')}</section>${this._renderAutoStopConfirmation()}
     </div>`;
+    this.shadowRoot.querySelector('button.system')?.addEventListener('click',()=>{this._autoStopExpanded=!this._autoStopExpanded;this._render()});
+    this.shadowRoot.querySelectorAll('.auto-stop-switch').forEach((button)=>button.addEventListener('click',(event)=>{event.stopPropagation();if(!button.disabled)this._requestAutoStop([button.dataset.entity],button.getAttribute('aria-checked')!=='true')}));
+    this.shadowRoot.querySelectorAll('[data-auto-stop-batch]').forEach((button)=>button.addEventListener('click',()=>{if(!button.disabled)this._requestAutoStop(this._autoStopStates().map((state)=>state.entityId),button.dataset.autoStopBatch==='true',true)}));
+    this.shadowRoot.querySelector('[data-auto-stop-cancel]')?.addEventListener('click',()=>this._closeAutoStopConfirmation());
+    this.shadowRoot.querySelector('[data-auto-stop-confirm]')?.addEventListener('click',()=>{if(!this._confirmationWritable())return;const {ids}=this._autoStopConfirmation;this._autoStopConfirmation=null;this._writeAutoStop(ids,false)});
     this.shadowRoot.querySelectorAll('.face').forEach((element)=>element.addEventListener('click',()=>this._moreInfo(element.dataset.entity)));
     this.shadowRoot.querySelectorAll('.more-info').forEach((button)=>button.addEventListener('click',(event)=>{event.stopPropagation();this._moreInfo(button.dataset.entity)}));
     this.shadowRoot.querySelectorAll('.controls button').forEach((button)=>button.addEventListener('click',(event)=>this._control(event)));
     this.shadowRoot.querySelectorAll('.global-controls button,.group-controls button').forEach((button)=>button.addEventListener('click',(event)=>this._globalControl(event)));
+    this.shadowRoot.querySelectorAll('.rollup-card > :not(.auto-stop-overlay)').forEach((element)=>{element.inert=Boolean(this._autoStopConfirmation)});
+    if(focus){const next=[...this.shadowRoot.querySelectorAll('button')].find((button)=>!button.disabled&&button.dataset?.entity===focus.entity&&button.dataset?.action===focus.action&&button.classList.contains('auto-stop-switch')===focus.auto&&button.classList.contains('system')===focus.system&&button.hasAttribute('data-auto-stop-confirm')===focus.confirm&&button.hasAttribute('data-auto-stop-cancel')===focus.cancel&&button.dataset?.autoStopBatch===focus.batch&&button.classList.contains('more-info')===focus.more);if(next&&!next.closest('[inert]'))next.focus()}
+    if(this._autoStopConfirmation&&!this.shadowRoot.activeElement?.closest('.auto-stop-dialog'))this.shadowRoot.querySelector('[data-auto-stop-cancel]')?.focus();
   }
 
   _renderFace(face){
     const state=resolveFaceState(face,this.hass.states);const displayName=String(face.name??'').trim();const meta=KIND_META[face.kind]??KIND_META.rollup;const visualPercent=state.positionKnown?state.percent:50;const accent=face.accent_color||this._config.open_color;const status=state.commandState==='conflict'?'#ff6b6b':state.moving?this._config.status_moving_color:this._config.status_idle_color;const light=18+visualPercent*.48;const open=face.accent_color||`hsl(43 96% ${light}%)`;const cls=`face cover-item kind-${face.kind} scroll-${face.scroll_mode} motion-${state.motion} ${state.moving?'moving':'idle'} ${state.positionKnown?'':'unknown'} ${state.commandState==='conflict'?'conflict':''} ${this._config.animation?'animated':''}`;
     const detail=state.integration?[state.commandLabel,state.confidenceLabel].filter(Boolean).join(' · '):state.available?`${Math.round(state.value)} ${this._config.unit} / ${state.maximum} ${this._config.unit}`:face.entity||'尚未設定實體';
-    const pending=this._pendingActions.get(state.controlEntity)??new Set();const directionDisabled=!state.available||state.commandState==='conflict'||pending.size>0;const stopDisabled=!state.available||pending.has('stop');
+    const pending=this._pendingActions.get(state.controlEntity)??new Set();const directionDisabled=!state.available||state.commandState==='conflict'||pending.size>0||this._autoStopPending.has(state.controlEntity);const stopDisabled=!state.available||pending.has('stop');
     const controlCount=['open','stop','close'].filter((action)=>state.supports?.[action]!==false).length;
     const controls=state.integration&&controlCount?`<div class="controls" role="group" style="--control-count:${controlCount}" aria-label="${escapeHtml(`${displayName}控制`)}">
       ${state.supports?.open!==false?`<button type="button" data-action="open" data-entity="${escapeHtml(state.controlEntity)}" ${directionDisabled?'disabled':''} aria-label="開啟${escapeHtml(displayName)}">${face.scroll_mode==='horizontal'?'▶':'▲'} 開啟</button>`:''}
       ${state.supports?.stop!==false?`<button type="button" class="stop" data-action="stop" data-entity="${escapeHtml(state.controlEntity)}" ${stopDisabled?'disabled':''} aria-label="停止${escapeHtml(displayName)}">■ 停止</button>`:''}
       ${state.supports?.close!==false?`<button type="button" data-action="close" data-entity="${escapeHtml(state.controlEntity)}" ${directionDisabled?'disabled':''} aria-label="關閉${escapeHtml(displayName)}">${face.scroll_mode==='horizontal'?'◀':'▼'} 關閉</button>`:''}
     </div>`:'';
+    const autoStop=resolveAutoStopState(face,this.hass.states);
+    const autoStopFooter=autoStop.supported?`<span class="auto-stop-setting"><span class="auto-stop-label">自動停機 <button type="button" class="auto-stop-switch" role="switch" data-entity="${escapeHtml(autoStop.entityId)}" aria-label="${escapeHtml(displayName)}自動停機${autoStop.known?'':'，狀態不完整'}" data-unknown="${!autoStop.known}" title="${escapeHtml(this._autoStopReason([autoStop])||'行程結束後關閉兩個方向 Switch')}" aria-checked="${autoStop.enabled===true}" aria-busy="${this._autoStopPending.has(autoStop.entityId)}" ${!this._autoStopWritable([autoStop])?'disabled':''}></button></span><em>${state.positionKnown?`${state.percent}%`:'N/A'}</em></span>`:'';
     return `<article class="${escapeHtml(cls)}" data-entity="${escapeHtml(state.controlEntity)}" style="--open:${visualPercent}%;--face-accent:${escapeHtml(accent)};--face-ui-color:${face.accent_color?escapeHtml(accent):'var(--rollup-ui-accent)'};--status-color:${escapeHtml(status)};--status-ui-color:${state.commandState==='conflict'?'var(--rollup-ui-danger)':state.moving?'var(--rollup-ui-accent)':'var(--rollup-ui-idle)'};--open-color:${escapeHtml(open)}">
       <div class="face-head"><span class="compass"><ha-icon icon="${escapeHtml(face.icon||meta.icon)}"></ha-icon>${face.direction?`<span>${escapeHtml(face.direction)}</span>`:''}</span><span class="name">${escapeHtml(displayName)}${face.label?`<small>${escapeHtml(face.label)}</small>`:''}</span><span class="motion"><i></i>${escapeHtml(state.motionLabel)}</span></div>
       <div class="scene" role="img" aria-label="${escapeHtml(`${meta.label}${displayName}，${state.positionLabel}，${state.motionLabel}`)}">
@@ -119,7 +231,7 @@ export class UninusGreenhouseRollupCard extends HTMLElement {
         <div class="curtain"><i class="shine"></i><b></b><b></b></div><div class="roller"><i></i><span></span><i></i></div>
         <span class="scale top">100</span><span class="scale mid">50</span><span class="scale bottom">0</span><strong class="percent">${state.positionKnown?`${state.percent}%`:'—'}</strong>
       </div>
-      <footer class="foot"><button type="button" class="more-info" data-entity="${escapeHtml(state.controlEntity)}" aria-label="開啟${escapeHtml(displayName)}詳細資料"><span class="copy"><strong>${escapeHtml(state.positionLabel)}</strong><small>${escapeHtml(detail)}</small></span><em>${state.positionKnown?`${state.percent}%`:'N/A'}</em></button></footer>
+      <footer class="foot ${autoStop.supported?'auto-stop-foot':''}"><button type="button" class="more-info" data-entity="${escapeHtml(state.controlEntity)}" aria-label="開啟${escapeHtml(displayName)}詳細資料" title="${escapeHtml(`${state.positionLabel} · ${detail}`)}"><span class="copy"><strong>${escapeHtml(state.positionLabel)}</strong><small>${escapeHtml(detail)}</small></span>${autoStop.supported?'':`<em>${state.positionKnown?`${state.percent}%`:'N/A'}</em>`}</button>${autoStopFooter}</footer>
       ${controls}
     </article>`;
   }
