@@ -1,6 +1,6 @@
 {
   "name": "uninus-greenhouse-rollup-card",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Home Assistant greenhouse card for arbitrary rollups, skylights, shades, and grouped Cover controls",
   "type": "module",
   "main": "uninus-greenhouse-rollup-card.js",

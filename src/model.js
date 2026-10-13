@@ -245,6 +245,29 @@ function resolveIntegrationCoverState(face, cover) {
   };
 }
 
+// Capability is deliberately structural; a missing setting/relay state is unknown,
+// not an unsupported device or an implicitly disabled safety setting.
+export function resolveAutoStopState(item, states = {}) {
+  const entityId = item.cover_entity;
+  const cover = states?.[entityId];
+  const attrs = cover?.attributes ?? {};
+  const switchId = (id) => typeof id === 'string' && /^switch\.[a-z0-9_]+$/.test(id);
+  const supported = item.entity_mode !== 'position_entity'
+    && /^cover\.[a-z0-9_]+$/.test(entityId ?? '')
+    && attrs.position_is_estimated === true
+    && switchId(attrs.open_switch_entity) && switchId(attrs.close_switch_entity)
+    && attrs.open_switch_entity !== attrs.close_switch_entity;
+  const enabled = typeof attrs.auto_stop_at_travel_end === 'boolean' ? attrs.auto_stop_at_travel_end : null;
+  const available = Boolean(cover) && !['unknown', 'unavailable'].includes(cover.state)
+    && attrs.command_state !== 'unavailable';
+  const busy = attrs.open_switch_on === true || attrs.close_switch_on === true
+    || ['opening', 'closing'].includes(cover?.state)
+    || ['opening', 'closing', 'opening_timer', 'closing_timer', 'conflict'].includes(attrs.command_state);
+  const known = enabled !== null && typeof attrs.open_switch_on === 'boolean'
+    && typeof attrs.close_switch_on === 'boolean';
+  return { entityId, supported, enabled, busy, available, known };
+}
+
 export function coverServiceForAction(action) {
   return ({ open: 'open_cover', stop: 'stop_cover', close: 'close_cover' })[action] ?? '';
 }
