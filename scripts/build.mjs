@@ -1,11 +1,12 @@
 import { build } from 'esbuild';
 import { readFile, writeFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 
 const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
-const outfile = new URL(`../${pkg.main}`, import.meta.url).pathname.replace(/^\/(.:)/, '$1');
+const outfile = fileURLToPath(new URL(`../${pkg.main}`, import.meta.url));
 
 await build({
-  entryPoints: [new URL('../src/index.js', import.meta.url).pathname.replace(/^\/(.:)/, '$1')],
+  entryPoints: [fileURLToPath(new URL('../src/index.js', import.meta.url))],
   bundle: true,
   minify: true,
   sourcemap: false,
