@@ -526,18 +526,23 @@ test('selectLayout uses the configured items per row at every card width', () =>
   }
 });
 
-test('adaptive items per row follows card-width breakpoints while preserving the fixed default', () => {
+test('adaptive items per row fits 220px tiles after subtracting actual padding borders and gaps', () => {
   assert.equal(DEFAULT_CONFIG.items_per_row, 2);
   assert.equal(normalizeConfig({ items_per_row: 'auto' }).items_per_row, 'auto');
   for (const [width, layout] of [
     [0, 'columns-1'],
     [360, 'columns-1'],
-    [519, 'columns-1'],
-    [520, 'columns-2'],
-    [819, 'columns-2'],
+    [474, 'columns-1'],
+    [475, 'columns-2'],
+    [500, 'columns-2'],
+    [724, 'columns-2'],
+    [725, 'columns-3'],
     [820, 'columns-3'],
-    [1119, 'columns-3'],
-    [1120, 'columns-4'],
+    [960, 'columns-3'],
+    [961, 'columns-4'],
+    [980, 'columns-4'],
+    [1020, 'columns-4'],
+    [1119, 'columns-4'],
     [1440, 'columns-4'],
   ]) {
     assert.equal(selectLayout({ width, itemsPerRow: 'auto' }), layout, `width=${width}`);

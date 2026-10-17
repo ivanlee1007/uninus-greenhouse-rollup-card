@@ -300,7 +300,12 @@ export function resolveSubtitle(config, states = {}) {
 export function selectLayout({ width = 0, itemsPerRow = DEFAULT_CONFIG.items_per_row } = {}) {
   if (itemsPerRow === 'auto') {
     const cardWidth = Math.max(0, Number(width) || 0);
-    const columns = cardWidth >= 1120 ? 4 : cardWidth >= 820 ? 3 : cardWidth >= 520 ? 2 : 1;
+    // Match .rollup-card padding/border and .faces gap in card.js. Base the
+    // count on readable tile space, not an assumed HA section span.
+    const padding = Math.max(12, Math.min(20, cardWidth * 0.025));
+    const gap = Math.max(8, Math.min(13, cardWidth * 0.018));
+    const contentWidth = Math.max(0, cardWidth - padding * 2 - 2);
+    const columns = Math.max(1, Math.min(4, Math.floor((contentWidth + gap) / (220 + gap))));
     return `columns-${columns}`;
   }
   const requested = Math.max(1, Math.min(4, Math.floor(Number(itemsPerRow)) || DEFAULT_CONFIG.items_per_row));
