@@ -21,7 +21,7 @@ test('reversed percentages update labels and scale without reversing geometry or
   assert.match(reverse.getAttribute('style'),new RegExp('--open:'+raw+'%'));
   assert.equal(reverse.querySelector('.scale.top').textContent,'0');
   assert.equal(reverse.querySelector('.scale.bottom').textContent,'100');
-  if(raw===25){assert.match(reverse.querySelector('.copy strong').textContent,/關閉.*75%/);assert.match(reverse.querySelector('.scene').getAttribute('aria-label'),/75%/)}
+  if(raw===25){assert.match(reverse.querySelector('.copy strong').textContent,/覆蓋率.*75%/);assert.match(reverse.querySelector('.scene').getAttribute('aria-label'),/75%/)}
  }
  c.shadowRoot.querySelector('[data-action="open"]').click();await new Promise(r=>setTimeout(r,0));
  assert.deepEqual(calls,[['cover','open_cover',{entity_id:'cover.a'}]]);
@@ -83,7 +83,7 @@ for(const raw of [0,25,100]){
    const display=index===0?100-raw:raw;
    assert.equal(face.querySelector('.percent').textContent,display+'%');
    assert.equal(face.querySelector('.auto-stop-setting em').textContent,display+'%');
-   assert.equal(face.querySelector('.copy strong').textContent,raw===0?'全閉':raw===100?'全開':index===0?'估算關閉 75%':'估算開啟 25%');
+   assert.equal(face.querySelector('.copy strong').textContent,`${raw===0?'全閉 · ':raw===100?'全開 · ':'估算'}${index===0?'覆蓋率':'開啟率'} ${display}%`);
    if(raw===25)assert.match(face.querySelector('.scene').getAttribute('aria-label'),new RegExp(display+'%'));
    assert.match(face.getAttribute('style'),new RegExp('--open:'+raw+'%'));
    assert.ok([...face.querySelectorAll('.controls button')].every(button=>!button.disabled));

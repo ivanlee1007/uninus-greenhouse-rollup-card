@@ -90,8 +90,10 @@ items:
 
 每個設施可在視覺化設定的「百分比顯示模式」選擇：
 
-- `normal`（一般，預設）：全關 **0%**，全開 **100%**，表示開啟比例。
-- `reversed`（反向）：全關 **100%**，全開 **0%**，表示關閉比例。
+- `normal`（開啟率，預設）：讀取同一個 Cover 的 `current_position`；全關 **0%**，全開 **100%**。
+- `reversed`（覆蓋率）：優先讀取同一個 Cover 的 `coverage_position`；全關 **100%**，全開 **0%**。這是原本「反向」模式，既有 YAML 值不變。
+
+新版 UNiNUS Integration 在原本的 `cover.*` 同時提供 `current_position` 與自訂 attribute `coverage_position`，由同一份位置估算推導；不新增 Sensor，也不建立第二套位置計時或儲存。卡片在覆蓋率模式直接使用 `coverage_position`，不再次反轉。
 
 ```yaml
 items:
@@ -102,9 +104,11 @@ items:
     percentage_mode: reversed
 ```
 
-同一卡片可混用兩種百分比模式；上下、左右捲動皆適用。動畫內百分比、資訊區百分比、刻度、部分位置文字及輔助閱讀標籤同步變更。反向模式的部分位置文字使用「關閉」比例，避免與開啟比例混淆；全開／全關名稱保持不變。
+同一卡片可混用兩種百分比模式；上下、左右捲動皆適用。動畫內百分比、資訊區百分比、刻度、位置文字及輔助閱讀標籤同步變更。資訊列明確標示「開啟率／覆蓋率」，全開／全閉時也附上指標，例如「全開 · 覆蓋率 0%」。
 
-此設定**只改卡片顯示**，不修改 HA 的 `current_position`、動畫實際開合方向、開／停／關服務或 Integration 校正／自動停機。HA 原生詳細資訊仍顯示 Entity 原本的開啟比例。未知或不可用位置不會被反算為 100%；未設定或無效值保持一般模式。
+此設定不修改 HA 的 `current_position`、動畫實際開合方向、開／停／關服務或 Integration 校正／自動停機。HA 原生詳細資訊仍顯示標準開啟位置，自訂覆蓋率可在同一個 Cover 的 attributes 查詢。
+
+相容規則：只有在 Entity **完全沒有** `coverage_position` 時（舊版 Integration、原生 Cover 或舊位置 Entity 模式），卡片才以開啟率推導覆蓋率；若該 attribute 已存在但為 `null`、非數值或超出 0～100，覆蓋率顯示未知，不偷偷回退計算。Cover 不可用或開啟位置未知時，兩種模式都不顯示數字。
 
 副標 Entity 與其他 Entity 選擇器只以 `value-changed` 儲存選取／清除結果，避免新版 HA 搜尋框的原生 `change` 事件提早重建編輯器而丟失選取。副標仍允許 `device_tracker` 等任意 Entity domain。
 

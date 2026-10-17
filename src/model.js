@@ -237,6 +237,11 @@ function resolveIntegrationCoverState(face, cover) {
     positionKnown,
     integration: true,
     managedCover,
+    coveragePositionProvided: Object.hasOwn(cover.attributes ?? {}, 'coverage_position'),
+    coveragePercent: typeof cover.attributes?.coverage_position === 'number'
+      && Number.isFinite(cover.attributes.coverage_position)
+      && cover.attributes.coverage_position >= 0 && cover.attributes.coverage_position <= 100
+      ? Math.round(cover.attributes.coverage_position) : null,
     controlEntity: face.cover_entity,
     confidence,
     confidenceLabel,

@@ -216,12 +216,17 @@ export class UninusGreenhouseRollupCard extends HTMLElement {
 
   _renderFace(face){
     const state=resolveFaceState(face,this.hass.states);const displayName=String(face.name??'').trim();const meta=KIND_META[face.kind]??KIND_META.rollup;const visualPercent=state.positionKnown?state.percent:50;const accent=face.accent_color||this._config.open_color;const status=state.commandState==='conflict'?'#ff6b6b':state.moving?this._config.status_moving_color:this._config.status_idle_color;const light=18+visualPercent*.48;const open=face.accent_color||`hsl(43 96% ${light}%)`;const cls=`face cover-item kind-${face.kind} scroll-${face.scroll_mode} motion-${state.motion} ${state.moving?'moving':'idle'} ${state.positionKnown?'':'unknown'} ${state.commandState==='conflict'?'conflict':''} ${this._config.animation?'animated':''}`;
-    // Display mode never changes HA positions, animation geometry, or cover commands.
+    // Both metrics belong to the same Cover. Geometry/services always use opening position.
     const reversed=face.percentage_mode==='reversed';
-    const percentageAvailable=state.available&&state.positionKnown;
-    const displayPercent=percentageAvailable?(reversed?100-state.percent:state.percent):null;
-    const positionLabel=reversed&&percentageAvailable&&state.percent>0&&state.percent<100
-      ?state.positionLabel.replace(`開啟 ${state.percent}%`,`關閉 ${displayPercent}%`):state.positionLabel;
+    const openingAvailable=state.available&&state.positionKnown;
+    // Derive only for older integrations/native covers that omit the attribute entirely.
+    // An explicit null/invalid coverage_position is authoritative unknown, not a fallback.
+    const displayPercent=openingAvailable?(reversed?(state.coveragePositionProvided?state.coveragePercent:100-state.percent):state.percent):null;
+    const percentageAvailable=displayPercent!==null;
+    const percentageLabel=reversed?'覆蓋率':'開啟率';
+    const positionLabel=percentageAvailable
+      ?`${state.percent<=0?'全閉 · ':state.percent>=100?'全開 · ':state.managedCover?'估算':''}${percentageLabel} ${displayPercent}%`
+      :openingAvailable&&reversed?'覆蓋率未知':state.positionLabel;
     const detail=state.integration?[state.commandLabel,state.confidenceLabel].filter(Boolean).join(' · '):state.available?`${Math.round(state.value)} ${this._config.unit} / ${state.maximum} ${this._config.unit}`:face.entity||'尚未設定實體';
     const pending=this._pendingActions.get(state.controlEntity)??new Set();const directionDisabled=!state.available||state.commandState==='conflict'||pending.size>0||this._autoStopPending.has(state.controlEntity);const stopDisabled=!state.available||pending.has('stop');
     const controlCount=['open','stop','close'].filter((action)=>state.supports?.[action]!==false).length;

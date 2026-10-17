@@ -43,7 +43,7 @@ export class UninusGreenhouseRollupCardEditor extends HTMLElement {
     ${this._text('name','顯示名稱',item.name,false,item.id)}
     <div class="field"><label>類型</label><select data-item="${escapeHtml(item.id)}" data-property="kind"><option value="rollup" ${item.kind==='rollup'?'selected':''}>捲簾</option><option value="skylight" ${item.kind==='skylight'?'selected':''}>天窗</option><option value="shade" ${item.kind==='shade'?'selected':''}>遮陽</option></select></div>
     <div class="field"><label>捲動模式</label><select data-item="${escapeHtml(item.id)}" data-property="scroll_mode"><option value="vertical" ${item.scroll_mode==='vertical'?'selected':''}>上下</option><option value="horizontal" ${item.scroll_mode==='horizontal'?'selected':''}>左右</option></select></div>
-    <div class="field"><label>百分比顯示模式</label><select data-item="${escapeHtml(item.id)}" data-property="percentage_mode"><option value="normal" ${item.percentage_mode==='normal'?'selected':''}>一般：全關 0%，全開 100%</option><option value="reversed" ${item.percentage_mode==='reversed'?'selected':''}>反向：全關 100%，全開 0%</option></select></div>
+    <div class="field"><label>百分比顯示模式</label><select data-item="${escapeHtml(item.id)}" data-property="percentage_mode"><option value="normal" ${item.percentage_mode==='normal'?'selected':''}>開啟率：全關 0%，全開 100%</option><option value="reversed" ${item.percentage_mode==='reversed'?'selected':''}>覆蓋率：全關 100%，全開 0%</option></select></div>
     ${this._text('group','群組（選填）',item.group,false,item.id)}${this._text('direction','方向（選填）',item.direction,false,item.id)}
     ${this._text('label','輔助標籤（選填）',item.label,false,item.id)}${this._text('icon','圖示（選填）',item.icon,false,item.id)}
     ${this._color('accent_color','此項目強調色',item.accent_color||this._config.open_color,item.id)}
