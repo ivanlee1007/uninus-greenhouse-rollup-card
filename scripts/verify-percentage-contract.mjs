@@ -11,7 +11,7 @@ const server = createServer(async (req, res) => {
   res.end(await readFile(new URL(files[req.url], import.meta.url)));
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-const managed = { position_is_estimated: true, position_confidence: 'calibrated', command_state: 'idle', supported_features: 11 };
+const managed = { position_is_estimated: true, position_confidence: 'calibrated', command_state: 'idle', supported_features: 11, open_switch_entity: 'switch.up', close_switch_entity: 'switch.down', open_switch_on: false, close_switch_on: false, auto_stop_at_travel_end: true };
 const scenarios = [
   ...[[0, 100], [25, 75], [100, 0], [25, 73]].map(([current_position, coverage_position]) => ({ name: `backend ${current_position}/${coverage_position}`, state: 'open', attributes: { ...managed, current_position, coverage_position }, expected: coverage_position })),
   { name: 'old integration', state: 'open', attributes: { ...managed, current_position: 25 }, expected: 75 },
@@ -52,7 +52,15 @@ try {
         card.addEventListener('hass-more-info', () => { window.coverageMoreInfo++; });
         document.body.append(card);
         await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        return [...card.shadowRoot.querySelectorAll('.face')].map(face => ({ percent: face.querySelector('.percent').textContent, label: face.querySelector('.copy strong').textContent, aria: face.querySelector('.scene').getAttribute('aria-label'), style: face.getAttribute('style'), overflow: face.scrollWidth > face.clientWidth + 1 }));
+        return [...card.shadowRoot.querySelectorAll('.face')].map(face => {
+          const metric = face.querySelector('.foot em');
+          const metricRect = metric.getBoundingClientRect();
+          const copyRect = face.querySelector('.copy').getBoundingClientRect();
+          return { percent: face.querySelector('.percent').textContent, label: metric.textContent, status: face.querySelector('.copy strong').textContent, aria: face.querySelector('.scene').getAttribute('aria-label'), style: face.getAttribute('style'), overflow: face.scrollWidth > face.clientWidth + 1,
+            metricVisible: metricRect.width > 0 && getComputedStyle(metric).display !== 'none',
+            metricOnRight: metricRect.left >= copyRect.right - 1 && metricRect.right <= face.getBoundingClientRect().right + 1,
+            footerPercentCount: (face.querySelector('.foot').textContent.match(/%/g) ?? []).length };
+        });
       }, { scenario, width });
       const label = `${entry} ${width}px ${scenario.name}`;
       assert.equal(actual[1].percent, scenario.expected === null ? '—' : `${scenario.expected}%`, `${label}: coverage source`);
@@ -61,7 +69,13 @@ try {
         assert.match(actual[0].label, /開啟率/, label);
         assert.match(actual[1].aria, /覆蓋率/, label);
       }
-      for (const face of actual) assert.equal(face.overflow, false, `${label}: tile overflow`);
+      for (const face of actual) {
+        assert.equal(face.overflow, false, `${label}: tile overflow`);
+        assert.doesNotMatch(face.status, /%|開啟率|覆蓋率/, `${label}: duplicate metric in left status`);
+        assert.equal(face.metricVisible, true, `${label}: right-hand metric hidden`);
+        assert.equal(face.metricOnRight, true, `${label}: metric not on right or overlaps status`);
+        assert.equal(face.footerPercentCount, face.percent === '—' ? 0 : 1, `${label}: duplicate footer percentage`);
+      }
       if (scenario.name === 'backend 25/73') {
         assert.match(actual[1].style, /--open:25%/, `${label}: geometry changed`);
         for (const action of ['open', 'stop', 'close']) await page.locator(`.face >> nth=1 >> [data-action="${action}"]`).click();
@@ -70,6 +84,9 @@ try {
       }
       if (process.env.LAYOUT_SCREENSHOT_DIR && entry === 'bundle' && width === 1020 && scenario.name === 'backend 100/0') {
         await page.locator('uninus-greenhouse-rollup-card').screenshot({ path: `${process.env.LAYOUT_SCREENSHOT_DIR}/rollup-coverage-contract.png` });
+      }
+      if (process.env.LAYOUT_SCREENSHOT_DIR && entry === 'bundle' && width === 360 && scenario.name === 'backend 100/0') {
+        await page.locator('.face').nth(1).screenshot({ path: `${process.env.LAYOUT_SCREENSHOT_DIR}/rollup-footer-percentage.png` });
       }
       cases++;
       console.log(`PASS ${label}`);

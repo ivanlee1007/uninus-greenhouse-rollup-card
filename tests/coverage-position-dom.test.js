@@ -7,6 +7,28 @@ const { UninusGreenhouseRollupCard } = await import('../src/card.js');
 const { UninusGreenhouseRollupCardEditor } = await import('../src/editor.js');
 customElements.define('coverage-test-card', UninusGreenhouseRollupCard);
 customElements.define('coverage-test-editor', UninusGreenhouseRollupCardEditor);
+for (const withAutoStop of [true, false]) {
+  test(`footer shows the labeled percentage only in the existing right-hand slot (auto-stop=${withAutoStop})`, () => {
+    for (const [opening, coverage, status] of [[100, 0, '全開'], [0, 100, '全閉'], [25, 75, '部分開啟（估算）']]) {
+      const attrs = { ...managed, current_position: opening, coverage_position: coverage };
+      if (withAutoStop) Object.assign(attrs, { open_switch_entity: 'switch.up', close_switch_entity: 'switch.down', open_switch_on: false, close_switch_on: false, auto_stop_at_travel_end: true });
+      const card = render(attrs);
+      try {
+        const [normal, reversed] = card.shadowRoot.querySelectorAll('.face');
+        for (const [face, metric, percent] of [[normal, '開啟率', opening], [reversed, '覆蓋率', coverage]]) {
+          const footer = face.querySelector('.foot');
+          assert.equal(footer.querySelector('em').textContent, `${metric} ${percent}%`);
+          assert.equal(footer.querySelector('.copy strong').textContent, status);
+          assert.doesNotMatch(footer.querySelector('.copy').textContent, /%|開啟率|覆蓋率/);
+          assert.equal(footer.textContent.match(/%/g)?.length, 1);
+          assert.equal(Boolean(footer.querySelector('.auto-stop-setting em')), withAutoStop);
+          assert.equal(face.querySelector('.percent').textContent, `${percent}%`);
+        }
+      } finally { card.remove(); }
+    }
+  });
+}
+
 const managed = { position_is_estimated: true, position_confidence: 'calibrated', command_state: 'idle', supported_features: 11 };
 function render(attributes, state = 'open') {
   const card = document.createElement('coverage-test-card');
@@ -22,12 +44,12 @@ test('coverage mode reads the backend attribute as-is, without a second inversio
   try {
     const [normal, reversed] = card.shadowRoot.querySelectorAll('.face');
     assert.equal(reversed.querySelector('.percent').textContent, '73%');
-    assert.equal(reversed.querySelector('.foot em').textContent, '73%');
-    assert.match(reversed.querySelector('.copy strong').textContent, /覆蓋率 73%/);
+    assert.equal(reversed.querySelector('.foot em').textContent, '覆蓋率 73%');
+    assert.match(reversed.querySelector('.foot em').textContent, /覆蓋率 73%/);
     assert.match(reversed.querySelector('.scene').getAttribute('aria-label'), /覆蓋率 73%/);
     assert.match(reversed.getAttribute('style'), /--open:25%/);
     assert.equal(normal.querySelector('.percent').textContent, '25%');
-    assert.match(normal.querySelector('.copy strong').textContent, /開啟率 25%/);
+    assert.match(normal.querySelector('.foot em').textContent, /開啟率 25%/);
   } finally { card.remove(); }
 });
 
@@ -38,8 +60,8 @@ for (const [opening, coverage, endpoint] of [[0, 100, '全閉'], [25, 75, ''], [
       const [normal, reversed] = card.shadowRoot.querySelectorAll('.face');
       assert.equal(normal.querySelector('.percent').textContent, `${opening}%`);
       assert.equal(reversed.querySelector('.percent').textContent, `${coverage}%`);
-      assert.match(normal.querySelector('.copy strong').textContent, new RegExp(`開啟率 ${opening}%`));
-      assert.match(reversed.querySelector('.copy strong').textContent, new RegExp(`覆蓋率 ${coverage}%`));
+      assert.match(normal.querySelector('.foot em').textContent, new RegExp(`開啟率 ${opening}%`));
+      assert.match(reversed.querySelector('.foot em').textContent, new RegExp(`覆蓋率 ${coverage}%`));
       if (endpoint) assert.ok(reversed.querySelector('.copy strong').textContent.startsWith(endpoint));
     } finally { card.remove(); }
   });
@@ -52,8 +74,8 @@ for (const invalid of [null, '', 'unknown', true, -1, 101]) {
       const [normal, reversed] = card.shadowRoot.querySelectorAll('.face');
       assert.equal(normal.querySelector('.percent').textContent, '25%');
       assert.equal(reversed.querySelector('.percent').textContent, '—');
-      assert.equal(reversed.querySelector('.foot em').textContent, 'N/A');
-      assert.equal(reversed.querySelector('.copy strong').textContent, '覆蓋率未知');
+      assert.equal(reversed.querySelector('.foot em').textContent, '覆蓋率 N/A');
+      assert.equal(reversed.querySelector('.copy strong').textContent, '部分開啟（估算）');
       assert.doesNotMatch(reversed.querySelector('.scene').getAttribute('aria-label'), /\d+%/);
       assert.match(reversed.getAttribute('style'), /--open:25%/);
     } finally { card.remove(); }
@@ -66,7 +88,7 @@ for (const attrs of [{ ...managed }, {}]) {
     try {
       const reversed = card.shadowRoot.querySelectorAll('.face')[1];
       assert.equal(reversed.querySelector('.percent').textContent, '75%');
-      assert.match(reversed.querySelector('.copy strong').textContent, /覆蓋率 75%/);
+      assert.match(reversed.querySelector('.foot em').textContent, /覆蓋率 75%/);
     } finally { card.remove(); }
   });
 }

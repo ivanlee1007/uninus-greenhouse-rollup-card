@@ -16,18 +16,18 @@ test('reversed percentages update labels and scale without reversing geometry or
   c.hass={states:{'cover.a':{state:'open',attributes:{current_position:raw,supported_features:11}}},callService:async(...args)=>calls.push(args)};
   const [reverse,normal]=c.shadowRoot.querySelectorAll('.face');
   assert.equal(reverse.querySelector('.percent').textContent,display+'%');
-  assert.equal(reverse.querySelector('.foot em').textContent,display+'%');
+  assert.equal(reverse.querySelector('.foot em').textContent,'覆蓋率 '+display+'%');
   assert.equal(normal.querySelector('.percent').textContent,raw+'%');
   assert.match(reverse.getAttribute('style'),new RegExp('--open:'+raw+'%'));
   assert.equal(reverse.querySelector('.scale.top').textContent,'0');
   assert.equal(reverse.querySelector('.scale.bottom').textContent,'100');
-  if(raw===25){assert.match(reverse.querySelector('.copy strong').textContent,/覆蓋率.*75%/);assert.match(reverse.querySelector('.scene').getAttribute('aria-label'),/75%/)}
+  if(raw===25){assert.match(reverse.querySelector('.foot em').textContent,/覆蓋率.*75%/);assert.match(reverse.querySelector('.scene').getAttribute('aria-label'),/75%/)}
  }
  c.shadowRoot.querySelector('[data-action="open"]').click();await new Promise(r=>setTimeout(r,0));
  assert.deepEqual(calls,[['cover','open_cover',{entity_id:'cover.a'}]]);
  c.hass={...c.hass,states:{'cover.a':{state:'open',attributes:{}}}};
  assert.equal(c.shadowRoot.querySelector('.percent').textContent,'—');
- assert.equal(c.shadowRoot.querySelector('.foot em').textContent,'N/A');c.remove();
+ assert.equal(c.shadowRoot.querySelector('.foot em').textContent,'覆蓋率 N/A');c.remove();
 });
 
 function renderPercentageModes(cover){
@@ -39,7 +39,7 @@ function renderPercentageModes(cover){
 
 function assertUnavailablePercentage(face,raw){
  assert.equal(face.querySelector('.percent').textContent,'—');
- assert.equal(face.querySelector('.foot em').textContent,'N/A');
+ assert.match(face.querySelector('.foot em').textContent,/^(開啟率|覆蓋率) N\/A$/);
  assert.equal(face.querySelector('.copy strong').textContent,'位置資料不可用');
  assert.match(face.querySelector('.scene').getAttribute('aria-label'),/位置資料不可用/);
  assert.doesNotMatch(face.querySelector('.scene').getAttribute('aria-label'),/\d+%/);
@@ -82,8 +82,8 @@ for(const raw of [0,25,100]){
   try{for(const [index,face] of [...c.shadowRoot.querySelectorAll('.face')].entries()){
    const display=index===0?100-raw:raw;
    assert.equal(face.querySelector('.percent').textContent,display+'%');
-   assert.equal(face.querySelector('.auto-stop-setting em').textContent,display+'%');
-   assert.equal(face.querySelector('.copy strong').textContent,`${raw===0?'全閉 · ':raw===100?'全開 · ':'估算'}${index===0?'覆蓋率':'開啟率'} ${display}%`);
+   assert.equal(face.querySelector('.auto-stop-setting em').textContent,`${index===0?'覆蓋率':'開啟率'} ${display}%`);
+   assert.equal(face.querySelector('.copy strong').textContent,raw===0?'全閉':raw===100?'全開':'部分開啟（估算）');
    if(raw===25)assert.match(face.querySelector('.scene').getAttribute('aria-label'),new RegExp(display+'%'));
    assert.match(face.getAttribute('style'),new RegExp('--open:'+raw+'%'));
    assert.ok([...face.querySelectorAll('.controls button')].every(button=>!button.disabled));

@@ -272,11 +272,11 @@ test('supported footer has sibling switch and percent in existing two-line info 
   const foot=card.shadowRoot.querySelector('.foot');
   assert.ok(toggle(card),'managed switch exists');
   assert.equal(toggle(card).closest('.more-info'),null);
-  assert.equal(foot.querySelector('.copy strong').textContent,'全開 · 開啟率 100%');
+  assert.equal(foot.querySelector('.copy strong').textContent,'全開');
   assert.equal(foot.querySelector('.copy small').textContent,'沒有控制命令 · 端點已校正');
-  assert.equal(foot.querySelector('.auto-stop-setting em').textContent,'100%');
+  assert.equal(foot.querySelector('.auto-stop-setting em').textContent,'開啟率 100%');
   assert.equal(card.shadowRoot.querySelectorAll('.auto-stop-switch').length,1);
   assert.equal(card.shadowRoot.querySelectorAll('.foot').length,3);
-  assert.equal(card.shadowRoot.querySelectorAll('.foot')[1].querySelector('.more-info em').textContent,'100%');
+  assert.equal(card.shadowRoot.querySelectorAll('.foot')[1].querySelector('.more-info em').textContent,'開啟率 100%');
   card.remove();
 });
