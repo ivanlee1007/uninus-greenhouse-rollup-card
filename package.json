@@ -1,13 +1,13 @@
 {
   "name": "uninus-greenhouse-rollup-card",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "Home Assistant greenhouse card for arbitrary rollups, skylights, shades, and grouped Cover controls",
   "type": "module",
   "main": "uninus-greenhouse-rollup-card.js",
   "scripts": {
     "test": "node --test",
     "build": "node scripts/build.mjs",
-    "test:browser": "node scripts/verify-stacking.mjs",
+    "test:browser": "node scripts/verify-stacking.mjs && node scripts/verify-header-layout.mjs",
     "check": "npm test && npm run build && node --check uninus-greenhouse-rollup-card.js",
     "ci": "npm run check && git diff --check"
   },
