@@ -1,0 +1,30 @@
+{
+  "fixture_schema": 1,
+  "provenance": "Synthetic offline wire acceptance. Expected calls are asserted against the shipped card; not native Home Assistant or physical actuation evidence.",
+  "config": {
+    "show_target_controls": true,
+    "show_climate_controls": true,
+    "show_global_controls": true,
+    "climate_hold_seconds": 1800,
+    "items": [{"id":"roof","name":"Roof","cover_entity":"cover.roof","climate_entity":"sensor.roof_climate"}]
+  },
+  "states": {
+    "cover.roof": {"state":"open","attributes":{"supported_features":15,"current_position":25}},
+    "sensor.roof_climate": {"state":"shadow","attributes":{"controller_schema":1,"cover_entity_id":"cover.roof","mode":"shadow","requested_position":null,"effective_target_position":null,"reason_codes":["shadow_preview"],"manual_until":null,"blocked":false}}
+  },
+  "services": {"uninus_greenhouse_climate":{"request_position":{},"set_mode":{},"clear_manual_hold":{}}},
+  "cases": [
+    {"id":"shadow_open","selector":".controls [data-action=open]","expected_calls":[["uninus_greenhouse_climate","request_position",{"entity_id":"sensor.roof_climate","position":100,"hold_seconds":1800}]]},
+    {"id":"shadow_close","selector":".controls [data-action=close]","expected_calls":[["uninus_greenhouse_climate","request_position",{"entity_id":"sensor.roof_climate","position":0,"hold_seconds":1800}]]},
+    {"id":"shadow_target_50","selector":".target-controls [data-position='50']","expected_calls":[["uninus_greenhouse_climate","request_position",{"entity_id":"sensor.roof_climate","position":50,"hold_seconds":1800}]]},
+    {"id":"stop","selector":".controls [data-action=stop]","expected_calls":[["uninus_greenhouse_climate","set_mode",{"entity_id":"sensor.roof_climate","mode":"paused"}],["cover","stop_cover",{"entity_id":"cover.roof"}]]},
+    {"id":"stop_pause_denied","selector":".controls [data-action=stop]","reject_services":["set_mode"],"error_contains":"Unauthorized","expected_calls":[["uninus_greenhouse_climate","set_mode",{"entity_id":"sensor.roof_climate","mode":"paused"}],["cover","stop_cover",{"entity_id":"cover.roof"}]]},
+    {"id":"request_denied_no_fallback","selector":".controls [data-action=open]","reject_services":["request_position"],"error_contains":"Unauthorized","expected_calls":[["uninus_greenhouse_climate","request_position",{"entity_id":"sensor.roof_climate","position":100,"hold_seconds":1800}]]},
+    {"id":"explicit_auto","selector":"[data-climate-mode=automatic]","confirm":true,"expected_calls":[["uninus_greenhouse_climate","set_mode",{"entity_id":"sensor.roof_climate","mode":"automatic"}]]},
+    {"id":"cancel_auto","selector":"[data-climate-mode=automatic]","confirm":false,"expected_calls":[]},
+    {"id":"clear_hold","selector":"[data-climate-resume]","sensor_attributes":{"manual_until":"2026-10-21T08:00:00+00:00"},"expected_calls":[["uninus_greenhouse_climate","clear_manual_hold",{"entity_id":"sensor.roof_climate"}]]},
+    {"id":"native_target_50","selector":".target-controls [data-position='50']","items":[{"id":"roof","cover_entity":"cover.roof"}],"expected_calls":[["cover","set_cover_position",{"entity_id":"cover.roof","position":50}]]},
+    {"id":"missing_controller_no_bypass","selector":".controls [data-action=open]","drop_sensor":true,"expected_calls":[]},
+    {"id":"mixed_global_open","selector":".global-open","items":[{"id":"roof","cover_entity":"cover.roof","climate_entity":"sensor.roof_climate"},{"id":"roof_alias","cover_entity":"cover.roof","climate_entity":"sensor.roof_climate"},{"id":"native","cover_entity":"cover.native"}],"extra_states":{"cover.native":{"state":"closed","attributes":{"supported_features":11}}},"expected_calls":[["uninus_greenhouse_climate","request_position",{"entity_id":"sensor.roof_climate","position":100,"hold_seconds":1800}],["cover","open_cover",{"entity_id":["cover.native"]}]]}
+  ]
+}

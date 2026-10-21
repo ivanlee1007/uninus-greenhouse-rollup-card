@@ -26,7 +26,7 @@ export class UninusGreenhouseRollupCardEditor extends HTMLElement {
   _handleChange(event){
     const element=event.target.closest?.('[data-property]')||event.target;if(!element?.dataset?.property)return;
     // HA pickers emit native search-blur changes before the selected value is ready.
-    if(element.localName==='ha-entity-picker'&&event.type!=='value-changed')return;
+    if(element.localName==='ha-entity-picker'&&(event.type!=='value-changed'||!this.shadowRoot.contains(element)))return;
     const valueType=element.dataset.valueType;let value=event.detail?.value??(valueType==='boolean'?element.checked:element.value??'');if(element.dataset.number==='true')value=Number(value);
     const change={property:element.dataset.property,value,valueType,itemId:element.dataset.item||undefined};
     let next=applyEditorChange(this._config,change);
@@ -49,7 +49,7 @@ export class UninusGreenhouseRollupCardEditor extends HTMLElement {
     ${this._color('accent_color','此項目強調色',item.accent_color||this._config.open_color,item.id)}
     <div class="field"><label>資料模式</label><select data-item="${escapeHtml(item.id)}" data-property="entity_mode"><option value="cover_entity" ${item.entity_mode==='cover_entity'?'selected':''}>標準 Cover</option><option value="position_entity" ${item.entity_mode==='position_entity'?'selected':''}>舊版位置 Entity</option></select></div>
     ${item.entity_mode==='cover_entity'
-      ?`${this._entity('cover_entity','標準 Cover Entity',item.cover_entity,item.id,['cover'])}${isCoverEntity(item.cover_entity)?'':'<p class="validation" role="alert">請選擇有效的 cover.* 標準 Cover Entity。</p>'}`
+      ?`${this._entity('cover_entity','標準 Cover Entity',item.cover_entity,item.id,['cover'])}${this._entity('climate_entity','環控控制器 Sensor（選填）',item.climate_entity,item.id,['sensor'])}${isCoverEntity(item.cover_entity)?'':'<p class="validation" role="alert">請選擇有效的 cover.* 標準 Cover Entity。</p>'}`
       :`${this._entity('entity','舊版位置 Entity',item.entity,item.id,['sensor','input_number'])}${this._entity('motion_entity','舊版移動狀態 Entity',item.motion_entity,item.id,['binary_sensor','sensor','input_boolean'])}${this._entity('max_entity','最大刻度 Entity（選填）',item.max_entity,item.id,['sensor','input_number'])}<div class="field"><label>固定最大刻度</label><input type="number" min="1" step="1" data-number="true" data-item="${escapeHtml(item.id)}" data-property="max_value" value="${item.max_value}"></div>`}
   </div></div></details>`}
   _render(){
@@ -69,6 +69,10 @@ export class UninusGreenhouseRollupCardEditor extends HTMLElement {
         <div class="field switch"><label>啟用動畫</label><input type="checkbox" data-property="animation" data-value-type="boolean" ${c.animation?'checked':''}></div>
         <div class="field switch full"><label>顯示「全開／全停／全關」全域控制</label><input type="checkbox" data-property="show_global_controls" data-value-type="boolean" ${c.show_global_controls?'checked':''}></div>
         <div class="field switch full"><label>依群組顯示「全開／全停／全關」控制</label><input type="checkbox" data-property="show_group_controls" data-value-type="boolean" ${c.show_group_controls?'checked':''}></div>
+        <div class="field switch full"><label>顯示目標開啟率 0／50／100% 按鈕</label><input type="checkbox" data-property="show_target_controls" data-value-type="boolean" ${c.show_target_controls?'checked':''}></div>
+        <div class="field switch full"><label>顯示環控模式／解除手動保持操作</label><input type="checkbox" data-property="show_climate_controls" data-value-type="boolean" ${c.show_climate_controls?'checked':''}></div>
+        <div class="field"><label>環控手動保持秒數（傳給後端）</label><input type="number" min="1" max="86400" step="1" data-number="true" data-property="climate_hold_seconds" value="${c.climate_hold_seconds}"></div>
+        <p class="field full">環境來源、門檻與安全規則請至環控整合設定。此編輯器只儲存關聯與顯示設定，不會啟動自動控制；保持期限由後端管理。</p>
       </div></section>
       <section class="section"><h3>Cover 項目</h3><div class="items">${c.items.map((item,index)=>this._renderItem(item,index)).join('')}</div><button type="button" class="add-item" data-action="add-item">＋ 新增 Cover 項目</button></section>
     </div>`;

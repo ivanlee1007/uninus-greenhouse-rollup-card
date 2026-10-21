@@ -25,6 +25,9 @@ export const DEFAULT_CONFIG = Object.freeze({
   animation: true,
   show_global_controls: false,
   show_group_controls: false,
+  show_target_controls: false,
+  show_climate_controls: false,
+  climate_hold_seconds: 1800,
   unit: '秒',
   status_idle_color: '#8798a2',
   status_moving_color: '#ffd54a',
@@ -59,6 +62,7 @@ function normalizeItem(input, index, used, legacyKey = '') {
     motion_entity: '',
     max_entity: '',
     ...value,
+    climate_entity: String(value.climate_entity ?? ''),
     id,
     key: id,
     entity_mode: value.entity_mode === 'cover_entity' || value.entity_mode === 'position_entity'
@@ -106,6 +110,9 @@ export function normalizeConfig(raw = {}) {
     animation: config.animation !== false,
     show_global_controls: config.show_global_controls === true,
     show_group_controls: config.show_group_controls === true,
+    show_target_controls: config.show_target_controls === true,
+    show_climate_controls: config.show_climate_controls === true,
+    climate_hold_seconds: Number.isInteger(config.climate_hold_seconds) && config.climate_hold_seconds >= 1 && config.climate_hold_seconds <= 86400 ? config.climate_hold_seconds : 1800,
     items: suppliedItems.map((item, index) => normalizeItem(item, index, usedIds, hasItems ? '' : FACE_KEYS[index])),
   };
   for (const key of ['status_idle_color', 'status_moving_color', 'closed_color', 'open_color']) {

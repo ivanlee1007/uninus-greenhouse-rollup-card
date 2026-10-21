@@ -1,0 +1,2 @@
+# Preserve the reviewed generated distribution bytes on Windows checkouts.
+uninus-greenhouse-rollup-card.js -text whitespace=cr-at-eol

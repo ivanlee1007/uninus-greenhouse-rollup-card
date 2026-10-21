@@ -60,7 +60,7 @@ items:
     cover_entity: cover.roof_1
 ```
 
-每個項目設定 `cover_entity` 後，原生 Cover 與 Integration Cover 都使用標準 `cover.open_cover`、`cover.stop_cover`、`cover.close_cover` services。`kind` 可為 `rollup`、`skylight` 或 `shade`；可選的 `direction`、`label`、`icon` 及 `group` 控制顯示與分組。`items` 沒有數量上限，`items_per_row` 只限制每列為 1～4 欄。
+每個項目設定 `cover_entity` 且**沒有關聯環控控制器**時，原生 Cover 與 Integration Cover 都使用標準 `cover.open_cover`、`cover.stop_cover`、`cover.close_cover` services。`kind` 可為 `rollup`、`skylight` 或 `shade`；可選的 `direction`、`label`、`icon` 及 `group` 控制顯示與分組。`items` 沒有數量上限，`items_per_row` 只限制每列為 1～4 欄。
 
 舊版 `faces:` 設定仍可直接載入，卡片會依東、南、西、北順序遷移；視覺化編輯器下一次儲存時只會輸出新版 `items:`。
 
@@ -161,6 +161,57 @@ Card 主標題會在 `18～24px` 間調整；副標題、狀態、估算位置�
 - 批次操作僅使用本卡片設定的適用 Cover，重複 Entity 去重；失敗或讀回逾時會顯示明確提示。
 - 左側次要資訊維持單行省略，可透過 tooltip 或點擊詳細資料查看。
 
+### 選用：環控控制器關聯與目標開啟率
+
+既有卡片不必修改。`climate_entity` 留空時維持原本 Cover 開／停／關行為；加入關聯不會自行切換成自動模式，也不會建立第二套 Cover 或位置估算器。
+
+1. 先在獨立的 **UNiNUS Greenhouse Climate** 後端整合設定中建立控制器，選定 Cover、環境 Sensor、環境門檻及安全規則。這些設定不放在卡片編輯器。
+2. 在卡片的標準 Cover 項目中，選擇「環控控制器 Sensor（選填）」；該 Sensor 的 `cover_entity_id` 必須完全等於該項目的 `cover_entity`。
+3. 可選擇顯示目標位置及環控操作入口。卡片只儲存關聯、顯示設定及每次請求使用的保持秒數，編輯或取消 Dashboard 設定不會呼叫後端服務。
+
+```yaml
+type: custom:uninus-greenhouse-rollup-card
+climate_hold_seconds: 1800
+show_target_controls: true
+show_climate_controls: true
+items:
+  - id: roof-1
+    name: 一號天窗
+    cover_entity: cover.roof_1
+    climate_entity: sensor.roof_1_climate
+```
+
+| 設定 | 預設 | 用途 |
+|---|---|---|
+| 項目 `climate_entity` | 空白 | 選用後端控制器 `sensor.*`，不是一般溫溼度 Sensor |
+| `climate_hold_seconds` | `1800` | `1～86400` 整數秒；隨手動請求傳給後端，無效值回到預設 |
+| `show_target_controls` | `false` | 顯示開啟率 `0／50／100%` 預設目標 |
+| `show_climate_controls` | `false` | 顯示影子／暫停／自動及解除手動保持操作 |
+
+**控制語意與安全邊界：**
+
+- 有關聯時，「開啟／關閉」分別請求控制器位置 `100／0`，不是直接開關 Cover；影子模式同樣可送出預覽請求，不會由卡片偷偷切換成自動模式。
+- `50%` 等中間位置需要 Cover 的 `SET_POSITION`（`supported_features` 位元 `4`）及已知位置；估算位置未校正／未知時停用中間位置，但保留原本端點開／關按鈕。無關聯的中間位置使用 `cover.set_cover_position`。
+- 所有目標都是**物理開啟率**：`0` 全閉、`100` 全開；`percentage_mode: reversed` 只改變覆蓋率顯示，不反轉送出的目標。
+- 關聯的「停止」先嘗試 `set_mode: paused`，然後呼叫 `cover.stop_cover`。即使非管理員或暫停遭拒，仍嘗試實體停止並顯示部分失敗；控制器遺失／格式錯誤時也不阻擋這個停止嘗試。暫停未確認代表環控可能仍會再次控制，請在後端確認模式與設備狀態。
+- 同一個 Cover 去重；同一卡片內（包含其他群組）若同一 Cover 有互相衝突的控制器，或同時存在有／無關聯的別名，拒絕方向請求，不能藉由其他列／群組繞過控制器。混合批次保留可執行目標，並逐項顯示失敗的 Cover；無關聯的 Cover 仍沿用原本批次服務。
+- 控制器缺少、不可用、schema 不符、Cover 不匹配、服務缺少或後端拒絕時，**不回退直接開關 Cover**。後端權限檢查是最終依據；卡片的管理員判斷不是授權機制。
+- `set_mode` 僅提供給管理員；點選「自動…」必須先確認「可能立即驅動設備」警告。解除手動保持只呼叫 `clear_manual_hold`，不暗中切換模式；目前為自動模式時也會先警告。請依 Sensor 讀回確認結果。
+- 小型狀態列顯示後端模式、請求位置、有效目標、原因代碼、安全阻擋及 `manual_until`。請求成功不等於設備到位；不樂觀改寫這些欄位或 Cover 位置。`blocked` 是後端權威警告，不由前端自行解除。
+- 手動保持期限、自動控制、安全計時、位置估算均由後端／裝置負責；**卡片沒有環控安全計時器**。原有「行程結束自動停機」開關仍是繼電器行程保護，並未改為環境自動化開關。
+
+**後端相依介面（schema 1；需另行安裝支援此介面的環控整合）：**
+
+控制器 Sensor 需提供 attributes：`controller_schema: 1`、`cover_entity_id`、`mode`（`shadow | automatic | paused`）、`requested_position`（數字或 `null`）、`effective_target_position`（數字或 `null`）、`reason_codes`（字串陣列）、`manual_until`（含時區 ISO 時間或 `null`）、`blocked`（布林）。卡片不根據 Sensor 名稱推斷 Cover 歸屬。
+
+| 服務 | 卡片送出的 data |
+|---|---|
+| `uninus_greenhouse_climate.request_position` | `{entity_id: sensor_id, position: 0..100 整數, hold_seconds: 1..86400 整數}` |
+| `uninus_greenhouse_climate.set_mode` | `{entity_id: sensor_id, mode: shadow/automatic/paused}`，管理員限定 |
+| `uninus_greenhouse_climate.clear_manual_hold` | `{entity_id: sensor_id}` |
+
+`tests/fixtures/climate-wire-acceptance.json` 提供可供後端 bridge 測試重用的離線輸入與精確 payload；`tests/climate-wire.test.js` 以實際出貨 bundle 驗證。這些是合成狀態測試，不是正式 HA／實體馬達驗收紀錄。
+
 ### 全域控制
 
 在視覺化設定的「版面與外觀」中啟用「顯示『全開／全停／全關』全域控制」，或在 YAML 設定：
@@ -172,6 +223,7 @@ show_global_controls: true
 - `全開`：對卡片內支援開啟的 Cover 呼叫 `cover.open_cover`。
 - `全停`：對卡片內支援停止的 Cover 呼叫 `cover.stop_cover`。
 - `全關`：對卡片內支援關閉的 Cover 呼叫 `cover.close_cover`。
+- 上述直接 Cover 服務適用於**沒有環控關聯**的項目；有關聯的目標依前述控制器請求／暫停後停止規則執行，並顯示部分失敗，不繞過環控。
 - 全域操作只控制目前這張卡片 `items` 中已設定、可用且支援該動作的 `cover.*`；不會搜尋或控制卡片之外的 Cover。
 - 重複設定的相同 Entity 只會呼叫一次；不可用、未設定、唯讀或不支援該動作的 Entity 會略過。
 - `show_global_controls` 預設為 `false`，升級既有卡片不會自行改變版面。
@@ -235,13 +287,14 @@ items:
 ## 開發
 
 ```bash
-npm install
+npm ci --ignore-scripts
 npm test
 npm run build
 npm run check
+npm run test:browser
 ```
 
-建置輸出為 `uninus-greenhouse-rollup-card.js`。CI 會執行 JavaScript 測試、bundle 建置、語法檢查、HACS validation 與版本一致性檢查。
+使用 Node.js 22 或更新版本執行測試與建置；瀏覽器測試使用 Playwright Chromium，只啟動 `127.0.0.1` 合成 HA 測試頁，不會連線正式 HA 或操作馬達。建置輸出為 `uninus-greenhouse-rollup-card.js`。CI 會執行 JavaScript 測試、bundle 建置、語法檢查、HACS validation 與版本一致性檢查。
 
 ## License
 
