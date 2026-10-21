@@ -8,6 +8,7 @@ const server = createServer(async (req, res) => {
   const files = {
     '/card.js': '../src/card.js',
     '/model.js': '../src/model.js',
+    '/climate.js': '../src/climate.js',
     '/bundle.js': '../uninus-greenhouse-rollup-card.js',
   };
   if (req.url === '/') {

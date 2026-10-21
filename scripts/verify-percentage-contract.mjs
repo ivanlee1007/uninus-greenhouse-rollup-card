@@ -5,7 +5,7 @@ import { chromium } from 'playwright';
 
 const server = createServer(async (req, res) => {
   if (req.url === '/') { res.setHeader('Content-Type', 'text/html'); res.end('<!doctype html><html lang="zh-Hant"><body style="margin:0;font-family:Arial,sans-serif"></body></html>'); return; }
-  const files = { '/card.js': '../src/card.js', '/model.js': '../src/model.js', '/bundle.js': '../uninus-greenhouse-rollup-card.js' };
+  const files = { '/card.js': '../src/card.js', '/model.js': '../src/model.js', '/climate.js': '../src/climate.js', '/bundle.js': '../uninus-greenhouse-rollup-card.js' };
   if (!files[req.url]) { res.writeHead(404).end(); return; }
   res.setHeader('Content-Type', 'text/javascript');
   res.end(await readFile(new URL(files[req.url], import.meta.url)));
