@@ -32,7 +32,7 @@ try {
       document.body.append(card);
     });
     // Resize the same connected card in both directions; do not set its class manually.
-    for (const width of [1020, 980, 961, 960, 820, 725, 724, 500, 475, 474, 360, 320, 961, 1280]) {
+    for (const width of [1020, 980, 961, 960, 820, 725, 724, 500, 475, 474, 423.5, 414, 413, 360, 320, 423.5, 413, 414, 961, 1280]) {
       await page.locator('uninus-greenhouse-rollup-card').evaluate((card, width) => { card.style.width = `${width}px`; }, width);
       await page.waitForFunction(width => {
         const card = document.querySelector('uninus-greenhouse-rollup-card');
@@ -53,19 +53,20 @@ try {
         };
       });
       // Derive the expected count from the browser's actual box model, independently of selectLayout.
-      const columns = Math.max(1, Math.min(4, Math.floor((geometry.grid.width + geometry.gap) / (220 + geometry.gap))));
+      const columns = [4, 3, 2, 1].find(count => count === 1 ||
+        geometry.grid.width >= count * (count === 2 ? 190 : 220) + (count - 1) * geometry.gap);
       const label = `${entry} auto width=${width}px`;
       assert.equal(geometry.layout, `columns-${columns}`, `${label}: does not use available tile space ${JSON.stringify({host:geometry.host,grid:geometry.grid,gap:geometry.gap})}`);
       if (width >= 961) assert.equal(columns, 4, `${label}: expected four tiles in one row`);
       assert.equal(new Set(geometry.faces.map(f => Math.round(f.top))).size, Math.ceil(4 / columns), `${label}: wrong row count`);
       assert.ok(geometry.host.height >= geometry.outer.height - 1, `${label}: host intrinsic height did not follow rows`);
       for (const face of geometry.faces) {
-        assert.ok(face.width >= 219.9, `${label}: tile below readable minimum`);
+        assert.ok(face.width >= (columns === 2 ? 189.9 : 219.9), `${label}: tile below readable minimum`);
         assert.ok(face.left >= geometry.grid.left - 1 && face.right <= geometry.grid.right + 1 && face.bottom <= geometry.outer.bottom + 1, `${label}: tile clipped`);
         for (const child of face.children) {
           assert.ok(child.left >= face.left - 1 && child.right <= face.right + 1 && child.bottom <= face.bottom + 1, `${label}: child clipped`);
         }
-        if (columns === 4) assert.ok(face.status.top < face.icon.bottom && face.status.bottom > face.icon.top, `${label}: four-column status should fit next to title`);
+        if (columns >= 2) assert.ok(face.status.top < face.icon.bottom && face.status.bottom > face.icon.top, `${label}: status should remain beside title`);
       }
       if (process.env.LAYOUT_SCREENSHOT_DIR && entry === 'bundle' && [1020, 360].includes(width)) {
         await page.locator('uninus-greenhouse-rollup-card').screenshot({ path: `${process.env.LAYOUT_SCREENSHOT_DIR}/rollup-auto-${width}.png` });

@@ -311,6 +311,9 @@ export function selectLayout({ width = 0, itemsPerRow = DEFAULT_CONFIG.items_per
     const gap = Math.max(8, Math.min(13, cardWidth * 0.018));
     const contentWidth = Math.max(0, cardWidth - padding * 2 - 2);
     const columns = Math.max(1, Math.min(4, Math.floor((contentWidth + gap) / (220 + gap))));
+    // Keep the established 220px admission for three/four columns. Compact
+    // pairs alone may use 190px tiles now that headers no longer reserve 100px.
+    if (columns === 1 && contentWidth >= 2 * 190 + gap) return 'columns-2';
     return `columns-${columns}`;
   }
   const requested = Math.max(1, Math.min(4, Math.floor(Number(itemsPerRow)) || DEFAULT_CONFIG.items_per_row));
