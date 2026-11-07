@@ -25,8 +25,8 @@ try {
       : "import '/bundle.js';" });
     await page.evaluate(() => customElements.whenDefined('uninus-greenhouse-rollup-card'));
     for (const columns of [3, 4, 1, 2]) {
-      for (const width of [440, 270, 180]) {
-        for (const name of ['東側', 'Relay-4FA5 cover0(hh) — 很長的溫室捲揚控制名稱 — 超長名稱測試確保省略顯示而不擠掉右上角狀態']) {
+      for (const width of [440, 270, 204, 180]) {
+        for (const name of ['東側', '東上捲揚', 'Relay-4FA5 cover0(hh) — 很長的溫室捲揚控制名稱 — 超長名稱測試確保省略顯示而不擠掉右上角狀態']) {
           const geometry = await page.evaluate(async ({ columns, width, name }) => {
             document.body.replaceChildren();
             const card = document.createElement('uninus-greenhouse-rollup-card');
@@ -45,12 +45,11 @@ try {
           }, { columns, width, name });
           const label = `${entry}: columns=${columns}, tile=${width}px, ${name}`;
           const { face, head, icon, title, status } = geometry;
-          if (width >= 270) {
-            assert.ok(status.top < icon.bottom && status.bottom > icon.top, `${label}: status incorrectly moved to second row`);
-            assert.ok(status.left >= title.right - 1, `${label}: title overlaps status`);
-            if (name.length > 10) { assert.equal(geometry.ellipsis, 'ellipsis'); assert.equal(geometry.clipped, true, `${label}: long name should truncate`); }
-          } else {
-            assert.ok(status.top >= icon.bottom, `${label}: narrow tile should wrap status`);
+          assert.ok(status.top < icon.bottom && status.bottom > icon.top, `${label}: status incorrectly moved to second row`);
+          assert.ok(status.left >= title.right - 1, `${label}: title overlaps status`);
+          if (name.length > 10) { assert.equal(geometry.ellipsis, 'ellipsis'); assert.equal(geometry.clipped, true, `${label}: long name should truncate`); }
+          if (name === '東上捲揚' && columns === 2 && width === 204) {
+            assert.equal(geometry.clipped, false, `${label}: site-sized four-character name must fit in full`);
           }
           for (const child of [icon, title, status]) {
             assert.ok(child.left >= head.left - 1 && child.right <= head.right + 1 && child.bottom <= head.bottom + 1, `${label}: header child overflow`);
