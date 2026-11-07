@@ -526,13 +526,16 @@ test('selectLayout uses the configured items per row at every card width', () =>
   }
 });
 
-test('adaptive items per row fits 220px tiles after subtracting actual padding borders and gaps', () => {
+test('adaptive layout admits compact 190px pairs while preserving 220px three/four-column thresholds', () => {
   assert.equal(DEFAULT_CONFIG.items_per_row, 2);
   assert.equal(normalizeConfig({ items_per_row: 'auto' }).items_per_row, 'auto');
   for (const [width, layout] of [
     [0, 'columns-1'],
     [360, 'columns-1'],
-    [474, 'columns-1'],
+    [413, 'columns-1'],
+    [414, 'columns-2'],
+    [423.5, 'columns-2'],
+    [474, 'columns-2'],
     [475, 'columns-2'],
     [500, 'columns-2'],
     [724, 'columns-2'],
