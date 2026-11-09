@@ -239,9 +239,13 @@ npm install
 npm test
 npm run build
 npm run check
+npx playwright install chromium webkit
+npm run test:browser
 ```
 
 建置輸出為 `uninus-greenhouse-rollup-card.js`。CI 會執行 JavaScript 測試、bundle 建置、語法檢查、HACS validation 與版本一致性檢查。
+
+捲動回歸測試可單獨執行 `node scripts/verify-scroll-stability.mjs`（先執行 `npm run build`）。它會在 WebKit 與 Chromium 檢查手機／桌面寬度、整頁／Shadow DOM 內的捲動容器，以及有／無鍵盤焦點時的連續 HA 更新；原始碼與發佈 bundle 都必須保持捲動位置、更新狀態，且每次點擊只發送一次事件或服務呼叫。卡片更新保留既有 DOM，避免 WebKit 在整棵 Shadow DOM 被替換時重設捲動位置；焦點恢復使用 `preventScroll`。這些是引擎自動測試，不等同 iPhone 實機驗證。
 
 ## License
 
