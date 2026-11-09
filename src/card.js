@@ -3,6 +3,25 @@ import { coverServiceForAction, GRID_OPTIONS, normalizeConfig, resolveAutoStopSt
 const escapeHtml=(value)=>String(value??'').replace(/[&<>"']/g,(char)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const KIND_META={rollup:{label:'捲簾',icon:'mdi:window-shutter'},skylight:{label:'天窗',icon:'mdi:window-open-variant'},shade:{label:'遮陽',icon:'mdi:roller-shade'}};
 
+// Patch the existing tree instead of detaching the dashboard's scroll content.
+// A live WebKit layout can clamp scrollTop while a shadow tree is replaced.
+function patchChildren(parent,next){
+  const compatible=(a,b)=>a?.nodeType===b.nodeType&&a.nodeName===b.nodeName;
+  for(let i=0;i<next.childNodes.length;i++){
+    const desired=next.childNodes[i];const current=parent.childNodes[i];
+    if(!compatible(current,desired)){
+      if(current)current.replaceWith(desired.cloneNode(true));else parent.append(desired.cloneNode(true));
+      continue;
+    }
+    if(desired.nodeType!==1){if(current.nodeValue!==desired.nodeValue)current.nodeValue=desired.nodeValue;continue}
+    for(const attr of [...current.attributes])if(!desired.hasAttribute(attr.name))current.removeAttribute(attr.name);
+    for(const attr of [...desired.attributes])if(current.getAttribute(attr.name)!==attr.value)current.setAttribute(attr.name,attr.value);
+    patchChildren(current,desired);
+  }
+  while(parent.childNodes.length>next.childNodes.length)parent.lastChild.remove();
+}
+
+
 export class UninusGreenhouseRollupCard extends HTMLElement {
 
   static styles = `
@@ -188,29 +207,35 @@ export class UninusGreenhouseRollupCard extends HTMLElement {
     return `<section id="auto-stop-panel" class="auto-stop-panel" aria-label="卡片內自動停機設定"><p>啟用後，由 Cover 啟動全開／全關並經過設定行程時間後，關閉兩個方向 Switch。僅套用此卡片內支援的雙開關 Cover。</p><div><button type="button" data-auto-stop-batch="true" ${disabled?'disabled':''}>全部啟用</button><button type="button" data-auto-stop-batch="false" ${disabled?'disabled':''}>全部停用</button></div></section>`;
   }
 
+  _updateMarkup(markup){
+    const template=document.createElement('template');template.innerHTML=markup;
+    patchChildren(this.shadowRoot,template.content);
+  }
+
   _render(){
     if(!this.shadowRoot)return;
-    if(!this.hass){this.shadowRoot.innerHTML=`<style>${this.constructor.styles}</style><div class="rollup-card"><div>等待 Home Assistant 狀態資料…</div></div>`;return}
+    if(!this.hass){this._updateMarkup(`<style>${this.constructor.styles}</style><div class="rollup-card"><div>等待 Home Assistant 狀態資料…</div></div>`);return}
     const active=this.shadowRoot.activeElement;const focus=active?{entity:active.dataset?.entity,action:active.dataset?.action,auto:active.classList.contains('auto-stop-switch'),system:active.classList.contains('system'),confirm:active.hasAttribute('data-auto-stop-confirm'),cancel:active.hasAttribute('data-auto-stop-cancel'),batch:active.dataset?.autoStopBatch,more:active.classList.contains('more-info')}:null;
     const tokens=resolveThemeTokens(this._config);const subtitle=resolveSubtitle(this._config,this.hass.states);
     const style=`--rollup-bg:${tokens.background};--rollup-surface:${tokens.surface};--rollup-text:${tokens.text};--rollup-muted:${tokens.muted};--rollup-frame:${tokens.frame};--rollup-shadow:${tokens.shadow};--rollup-ui-accent:${tokens.uiAccent};--rollup-ui-idle:${tokens.uiIdle};--rollup-ui-danger:${tokens.uiDanger};--rollup-moving:${this._config.status_moving_color};--rollup-idle:${this._config.status_idle_color};--closed-color:${this._config.closed_color};--open-color:${this._config.open_color}`;
-    this.shadowRoot.innerHTML=`<style>${this.constructor.styles}</style><div class="rollup-card ${escapeHtml(this._layout)}" style="${escapeHtml(style)}" aria-label="${escapeHtml(`${this._config.title}，${subtitle}`)}">
+    this._updateMarkup(`<style>${this.constructor.styles}</style><div class="rollup-card ${escapeHtml(this._layout)}" style="${escapeHtml(style)}" aria-label="${escapeHtml(`${this._config.title}，${subtitle}`)}">
       <header class="header"><div><h2>${escapeHtml(this._config.title)}</h2>${subtitle?`<p>${escapeHtml(subtitle)}</p>`:''}</div>${this._renderAutoStopHeader()}</header>${this._renderAutoStopPanel()}${this._autoStopError?`<p class="auto-stop-error" role="alert">${escapeHtml(this._autoStopError)}</p>`:''}
       ${this._renderGlobalControls()}
       ${this._renderGroupControls()}
       <section class="faces">${this._config.items.map((item)=>this._renderFace(item)).join('')}</section>${this._renderAutoStopConfirmation()}
-    </div>`;
-    this.shadowRoot.querySelector('button.system')?.addEventListener('click',()=>{this._autoStopExpanded=!this._autoStopExpanded;this._render()});
-    this.shadowRoot.querySelectorAll('.auto-stop-switch').forEach((button)=>button.addEventListener('click',(event)=>{event.stopPropagation();if(!button.disabled)this._requestAutoStop([button.dataset.entity],button.getAttribute('aria-checked')!=='true')}));
-    this.shadowRoot.querySelectorAll('[data-auto-stop-batch]').forEach((button)=>button.addEventListener('click',()=>{if(!button.disabled)this._requestAutoStop(this._autoStopStates().map((state)=>state.entityId),button.dataset.autoStopBatch==='true',true)}));
-    this.shadowRoot.querySelector('[data-auto-stop-cancel]')?.addEventListener('click',()=>this._closeAutoStopConfirmation());
-    this.shadowRoot.querySelector('[data-auto-stop-confirm]')?.addEventListener('click',()=>{if(!this._confirmationWritable())return;const {ids}=this._autoStopConfirmation;this._autoStopConfirmation=null;this._writeAutoStop(ids,false)});
-    this.shadowRoot.querySelectorAll('.face').forEach((element)=>element.addEventListener('click',()=>this._moreInfo(element.dataset.entity)));
-    this.shadowRoot.querySelectorAll('.more-info').forEach((button)=>button.addEventListener('click',(event)=>{event.stopPropagation();this._moreInfo(button.dataset.entity)}));
-    this.shadowRoot.querySelectorAll('.controls button').forEach((button)=>button.addEventListener('click',(event)=>this._control(event)));
-    this.shadowRoot.querySelectorAll('.global-controls button,.group-controls button').forEach((button)=>button.addEventListener('click',(event)=>this._globalControl(event)));
+    </div>`);
+    // Replace click handlers: these nodes now survive repeated HA updates.
+    const systemButton=this.shadowRoot.querySelector('button.system');if(systemButton)systemButton.onclick=()=>{this._autoStopExpanded=!this._autoStopExpanded;this._render()};
+    this.shadowRoot.querySelectorAll('.auto-stop-switch').forEach((button)=>button.onclick=(event)=>{event.stopPropagation();if(!button.disabled)this._requestAutoStop([button.dataset.entity],button.getAttribute('aria-checked')!=='true')});
+    this.shadowRoot.querySelectorAll('[data-auto-stop-batch]').forEach((button)=>button.onclick=()=>{if(!button.disabled)this._requestAutoStop(this._autoStopStates().map((state)=>state.entityId),button.dataset.autoStopBatch==='true',true)});
+    const cancelButton=this.shadowRoot.querySelector('[data-auto-stop-cancel]');if(cancelButton)cancelButton.onclick=()=>this._closeAutoStopConfirmation();
+    const confirmButton=this.shadowRoot.querySelector('[data-auto-stop-confirm]');if(confirmButton)confirmButton.onclick=()=>{if(!this._confirmationWritable())return;const {ids}=this._autoStopConfirmation;this._autoStopConfirmation=null;this._writeAutoStop(ids,false)};
+    this.shadowRoot.querySelectorAll('.face').forEach((element)=>element.onclick=()=>this._moreInfo(element.dataset.entity));
+    this.shadowRoot.querySelectorAll('.more-info').forEach((button)=>button.onclick=(event)=>{event.stopPropagation();this._moreInfo(button.dataset.entity)});
+    this.shadowRoot.querySelectorAll('.controls button').forEach((button)=>button.onclick=(event)=>this._control(event));
+    this.shadowRoot.querySelectorAll('.global-controls button,.group-controls button').forEach((button)=>button.onclick=(event)=>this._globalControl(event));
     this.shadowRoot.querySelectorAll('.rollup-card > :not(.auto-stop-overlay)').forEach((element)=>{element.inert=Boolean(this._autoStopConfirmation)});
-    if(focus){const next=[...this.shadowRoot.querySelectorAll('button')].find((button)=>!button.disabled&&button.dataset?.entity===focus.entity&&button.dataset?.action===focus.action&&button.classList.contains('auto-stop-switch')===focus.auto&&button.classList.contains('system')===focus.system&&button.hasAttribute('data-auto-stop-confirm')===focus.confirm&&button.hasAttribute('data-auto-stop-cancel')===focus.cancel&&button.dataset?.autoStopBatch===focus.batch&&button.classList.contains('more-info')===focus.more);if(next&&!next.closest('[inert]'))next.focus()}
+    if(focus){const next=[...this.shadowRoot.querySelectorAll('button')].find((button)=>!button.disabled&&button.dataset?.entity===focus.entity&&button.dataset?.action===focus.action&&button.classList.contains('auto-stop-switch')===focus.auto&&button.classList.contains('system')===focus.system&&button.hasAttribute('data-auto-stop-confirm')===focus.confirm&&button.hasAttribute('data-auto-stop-cancel')===focus.cancel&&button.dataset?.autoStopBatch===focus.batch&&button.classList.contains('more-info')===focus.more);if(next&&!next.closest('[inert]'))next.focus({preventScroll:true})}
     if(this._autoStopConfirmation&&!this.shadowRoot.activeElement?.closest('.auto-stop-dialog'))this.shadowRoot.querySelector('[data-auto-stop-cancel]')?.focus();
   }
 

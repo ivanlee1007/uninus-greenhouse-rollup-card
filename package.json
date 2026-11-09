@@ -7,7 +7,7 @@
   "scripts": {
     "test": "node --test",
     "build": "node scripts/build.mjs",
-    "test:browser": "node scripts/verify-stacking.mjs && node scripts/verify-header-layout.mjs && node scripts/verify-auto-layout.mjs && node scripts/verify-percentage-contract.mjs",
+    "test:browser": "node scripts/verify-stacking.mjs && node scripts/verify-header-layout.mjs && node scripts/verify-auto-layout.mjs && node scripts/verify-percentage-contract.mjs && node scripts/verify-scroll-stability.mjs",
     "check": "npm test && npm run build && node --check uninus-greenhouse-rollup-card.js",
     "ci": "npm run check && git diff --check"
   },
